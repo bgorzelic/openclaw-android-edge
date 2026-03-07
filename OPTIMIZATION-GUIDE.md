@@ -1,6 +1,6 @@
 # OpenClaw on Budget Android: Optimization Guide
 
-> **Device:** Google Pixel 10a (2026) — 8 GB RAM, 128 GB storage, Tensor G5, $349 MSRP
+> **Device:** Google Pixel 10a (2026) — 8 GB RAM, 128 GB storage, Tensor G4, $349 MSRP
 > **Goal:** Run a reliable, always-on AI gateway on the cheapest current-gen Pixel
 > **Status:** Working in production — gateway + SSH + Tailscale, accessible from anywhere
 
@@ -373,7 +373,7 @@ ssh termux 'kill -9 $(pgrep -f openclaw-gateway); sleep 2; nohup openclaw gatewa
 ### Long Term
 - [ ] Multi-phone cluster (home + office + car)
 - [ ] Phone-to-phone agent communication
-- [ ] Edge AI model running locally (llama.cpp on Tensor G5)
+- [ ] Edge AI model running locally (llama.cpp on Tensor G4)
 - [ ] Sensor fusion (GPS + camera + AI for field work)
 
 ---
