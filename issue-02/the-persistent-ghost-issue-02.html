@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Persistent Ghost — Issue #2: The Edge Node | SpookyJuice</title>
+  <meta name="description" content="Issue #2 of The Persistent Ghost — turning a $499 Pixel 10a into an always-on AI edge node with OpenClaw. No root. No bootloader unlock. Full error log." />
+  <meta property="og:title" content="The Persistent Ghost — Issue #2: The Edge Node" />
+  <meta property="og:description" content="A $499 phone becomes an always-on AI edge node. 8 errors, 8 fixes, 15 minutes. The ghost runs on phones now." />
+  <meta property="og:image" content="https://spookyjuice.ai/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@SpookyJuiceAI" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #08080f;
+      --bg2:         #0e0e1a;
+      --bg3:         #12121f;
+      --card:        #111120;
+      --border:      #1e1e35;
+      --green:       #39ff14;
+      --green-dim:   #1a7a08;
+      --green-glow:  rgba(57,255,20,0.18);
+      --purple:      #8b5cf6;
+      --purple-dim:  #3b1d8a;
+      --purple-glow: rgba(139,92,246,0.18);
+      --cyan:        #22d3ee;
+      --text:        #e2e8f0;
+      --text-muted:  #94a3b8;
+      --text-faint:  #4a5568;
+      --orange:      #f97316;
+      --orange-glow: rgba(249,115,22,0.18);
+      --red:         #ef4444;
+      --red-glow:    rgba(239,68,68,0.15);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px);
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .wrapper { max-width: 680px; margin: 0 auto; padding: 0 16px 60px; }
+
+    /* ── HEADER ── */
+    .header { text-align: center; padding: 48px 24px 36px; border-bottom: 1px solid var(--border); position: relative; }
+
+    .ghost-logo {
+      width: 120px; height: 120px; margin: 0 auto 20px; display: block;
+      filter: drop-shadow(0 0 24px var(--green)) drop-shadow(0 0 48px rgba(57,255,20,0.4));
+      animation: float 4s ease-in-out infinite; border-radius: 50%;
+    }
+    @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+
+    .brand-name { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.35em; text-transform: uppercase; color: var(--green); margin-bottom: 12px; }
+    .newsletter-title { font-size: 42px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 8px; }
+    .newsletter-title span { background: linear-gradient(135deg, var(--green) 0%, var(--cyan) 50%, var(--purple) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .newsletter-tagline { font-size: 14px; color: var(--text-muted); letter-spacing: 0.08em; }
+
+    .issue-badge {
+      display: inline-flex; align-items: center; gap: 8px; margin: 24px auto 0; padding: 8px 20px;
+      border: 1px solid var(--green); border-radius: 999px; background: var(--green-glow);
+      font-family: 'Space Mono', monospace; font-size: 12px; color: var(--green); letter-spacing: 0.1em;
+    }
+    .issue-badge::before { content: '◉'; animation: pulse-dot 2s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* ── META BAR ── */
+    .meta-bar { display: flex; justify-content: center; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-faint); font-family: 'Space Mono', monospace; flex-wrap: wrap; }
+    .meta-bar span { display: flex; align-items: center; gap: 6px; }
+    .meta-bar a { color: var(--text-muted); text-decoration: none; }
+    .meta-bar a:hover { color: var(--green); }
+
+    /* ── OPENING ── */
+    .opening { padding: 40px 0 0; }
+    .opening-lead { font-size: 20px; line-height: 1.65; color: var(--text); border-left: 3px solid var(--green); padding-left: 20px; margin-bottom: 24px; }
+    p { margin-bottom: 18px; color: var(--text-muted); }
+
+    /* ── SECTION HEADERS ── */
+    .section-header { display: flex; align-items: center; gap: 12px; margin: 40px 0 20px; }
+    .section-header h2 { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+    .section-pill { padding: 3px 10px; border-radius: 999px; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+    .pill-green { background: var(--green-glow); border: 1px solid var(--green); color: var(--green); }
+    .pill-purple { background: var(--purple-glow); border: 1px solid var(--purple); color: var(--purple); }
+    .pill-cyan { background: rgba(34,211,238,0.12); border: 1px solid var(--cyan); color: var(--cyan); }
+    .pill-orange { background: var(--orange-glow); border: 1px solid var(--orange); color: var(--orange); }
+    .pill-red { background: var(--red-glow); border: 1px solid var(--red); color: var(--red); }
+
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 40px 0; }
+
+    /* ── FEATURE CARDS ── */
+    .feature-grid { display: grid; gap: 16px; margin: 24px 0; }
+    .feature-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px;
+      position: relative; overflow: hidden; transition: border-color 0.2s, transform 0.2s;
+    }
+    .feature-card:hover { border-color: var(--green); transform: translateY(-2px); }
+    .feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--green), var(--purple)); }
+    .feature-card h3 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+    .feature-card .icon { width: 32px; height: 32px; background: var(--green-glow); border: 1px solid var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .feature-card p { font-size: 14px; color: var(--text-muted); margin: 0; }
+
+    /* ── SPEC TABLE ── */
+    .spec-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 20px 0; }
+    .spec-table th { text-align: left; padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); font-family: 'Space Mono', monospace; font-size: 11px; color: var(--green); letter-spacing: 0.08em; text-transform: uppercase; }
+    .spec-table td { padding: 10px 14px; border: 1px solid var(--border); color: var(--text-muted); vertical-align: top; }
+    .spec-table tr:hover td { background: var(--bg3); }
+    .spec-table td:first-child { font-family: 'Space Mono', monospace; color: var(--cyan); font-size: 12px; white-space: nowrap; }
+
+    /* ── ERROR LOG ── */
+    .error-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px;
+      margin: 12px 0; position: relative; overflow: hidden;
+    }
+    .error-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+    .error-card.error-fail::before { background: linear-gradient(90deg, var(--red), var(--orange)); }
+    .error-card.error-fix::before { background: linear-gradient(90deg, var(--green), var(--cyan)); }
+    .error-num { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.1em; margin-bottom: 6px; }
+    .error-num.fail { color: var(--red); }
+    .error-num.fix { color: var(--green); }
+    .error-card h4 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .error-card p { font-size: 13px; margin: 0; }
+    .error-card code { background: var(--bg3); padding: 2px 6px; border-radius: 4px; font-family: 'Space Mono', monospace; font-size: 12px; color: var(--orange); }
+
+    /* ── HIGHLIGHT BLOCK ── */
+    .highlight-block { background: var(--bg3); border-left: 3px solid var(--purple); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; }
+    .highlight-block p { margin: 0; font-size: 14px; }
+
+    /* ── CODE BLOCK ── */
+    .code-block {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+      font-family: 'Space Mono', monospace; font-size: 12px; line-height: 1.8; margin: 20px 0;
+      overflow-x: auto; color: var(--text-muted);
+    }
+    .code-block .comment { color: var(--text-faint); }
+    .code-block .cmd { color: var(--green); }
+    .code-block .flag { color: var(--cyan); }
+
+    /* ── POWER MGMT VIZ ── */
+    .power-viz { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 20px; font-family: 'Space Mono', monospace; font-size: 12px; line-height: 1.8; margin: 20px 0; overflow-x: auto; }
+    .pv-layer { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .pv-layer:last-child { border-bottom: none; }
+    .pv-num { color: var(--text-faint); width: 20px; text-align: right; flex-shrink: 0; }
+    .pv-bar { height: 8px; border-radius: 4px; flex-shrink: 0; }
+    .pv-label { color: var(--text-muted); flex: 1; }
+    .pv-fix { color: var(--green); font-size: 11px; white-space: nowrap; }
+
+    /* ── GITHUB CTA ── */
+    .github-card {
+      background: linear-gradient(135deg, #0e0e1a 0%, #120d22 100%); border: 1px solid var(--purple);
+      border-radius: 16px; padding: 28px; position: relative; overflow: hidden; margin: 24px 0;
+    }
+    .github-card::before { content: ''; position: absolute; top: -60px; right: -60px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%); pointer-events: none; }
+    .github-label { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--purple); margin-bottom: 8px; }
+    .github-card h3 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+    .github-card p { font-size: 14px; color: var(--text-muted); margin-bottom: 18px; }
+    .github-card .tag-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+    .tag { padding: 4px 10px; background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.3); border-radius: 6px; font-size: 11px; color: var(--purple); font-family: 'Space Mono', monospace; }
+
+    .btn { display: inline-block; padding: 10px 22px; border-radius: 8px; font-weight: 600; font-size: 14px; text-decoration: none; transition: all 0.2s; cursor: pointer; font-family: 'Space Grotesk', sans-serif; }
+    .btn-green { background: var(--green); color: #08080f; border: none; }
+    .btn-green:hover { box-shadow: 0 0 20px var(--green-glow); transform: translateY(-1px); }
+    .btn-outline-purple { background: transparent; border: 1px solid var(--purple); color: var(--purple); }
+    .btn-outline-purple:hover { background: var(--purple-glow); box-shadow: 0 0 20px var(--purple-glow); }
+
+    /* ── EMAIL CAPTURE ── */
+    .capture-section { background: linear-gradient(135deg, #0e0e1a 0%, #0a0f1a 100%); border: 1px solid var(--green); border-radius: 16px; padding: 36px 28px; text-align: center; position: relative; overflow: hidden; margin: 40px 0; }
+    .capture-section::before { content: ''; position: absolute; top: -80px; left: 50%; transform: translateX(-50%); width: 300px; height: 200px; background: radial-gradient(ellipse, rgba(57,255,20,0.08) 0%, transparent 70%); pointer-events: none; }
+    .capture-section h2 { font-size: 26px; font-weight: 700; color: var(--text); margin-bottom: 10px; position: relative; }
+    .capture-section p { font-size: 15px; color: var(--text-muted); margin-bottom: 24px; position: relative; max-width: 440px; margin-left: auto; margin-right: auto; }
+    .capture-form { display: flex; gap: 12px; max-width: 440px; margin: 0 auto; position: relative; }
+    .capture-form input { flex: 1; padding: 12px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'Space Grotesk', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s; }
+    .capture-form input:focus { border-color: var(--green); }
+    .capture-form input::placeholder { color: var(--text-faint); }
+    .capture-note { font-size: 12px; color: var(--text-faint); margin-top: 12px !important; margin-bottom: 0 !important; }
+
+    /* ── CONNECT / SOCIAL ── */
+    .connect-section { margin: 40px 0; }
+    .social-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-top: 20px; }
+    .social-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; text-decoration: none; transition: all 0.2s; display: block; }
+    .social-card:hover { border-color: var(--green); transform: translateY(-2px); }
+    .social-card .social-icon { font-size: 28px; margin-bottom: 8px; }
+    .social-card .social-name { font-weight: 600; color: var(--text); font-size: 15px; margin-bottom: 4px; }
+    .social-card .social-handle { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--green); }
+
+    /* ── CLOSING QUOTE ── */
+    .closing-quote { text-align: center; padding: 32px 0; font-family: 'Space Mono', monospace; font-size: 15px; color: var(--text-muted); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); line-height: 1.9; position: relative; }
+    .closing-quote strong { color: var(--green); display: block; font-size: 18px; margin-top: 8px; }
+
+    /* ── FOOTER ── */
+    .footer { text-align: center; padding: 36px 0 0; }
+    .footer-ghost { font-size: 28px; margin-bottom: 10px; filter: drop-shadow(0 0 8px var(--green)); }
+    .footer-brand { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .footer-sub { font-size: 12px; color: var(--text-faint); margin-bottom: 20px; }
+    .footer-links { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+    .footer-links a { font-size: 12px; color: var(--text-muted); text-decoration: none; }
+    .footer-links a:hover { color: var(--green); }
+    .footer-legal { font-size: 11px; color: var(--text-faint); line-height: 1.8; }
+    .footer-legal a { color: var(--text-faint); text-decoration: underline; }
+
+    @media (max-width: 600px) {
+      .newsletter-title { font-size: 30px; }
+      .capture-form { flex-direction: column; }
+      .social-grid { grid-template-columns: 1fr 1fr; }
+      .spec-table { font-size: 11px; }
+      .spec-table td, .spec-table th { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ══ HEADER ══ -->
+  <header class="header">
+    <img class="ghost-logo" src="https://spookyjuice.ai/images/spookyjuiceai.png" alt="SpookyJuice Ghost Logo" />
+    <div class="brand-name">SpookyJuice · A Persistent AI Agent Platform</div>
+    <h1 class="newsletter-title">The <span>Persistent</span> Ghost</h1>
+    <div class="newsletter-tagline">A SpookyJuice Dispatch</div>
+    <div class="issue-badge">Issue #2 — The Edge Node — March 2026</div>
+  </header>
+
+  <!-- ══ META BAR ══ -->
+  <div class="meta-bar">
+    <span>🖥️ <a href="https://spookyjuice.ai" target="_blank">spookyjuice.ai</a></span>
+    <span>🐦 <a href="https://x.com/SpookyJuiceAI" target="_blank">@SpookyJuiceAI</a></span>
+    <span>💬 Discord: SpookyJuice.AI</span>
+    <span>📅 March 2026</span>
+  </div>
+
+  <!-- ══ OPENING ══ -->
+  <section class="opening">
+    <p class="opening-lead">
+      We bought a phone. We made it a server. <strong style="color:var(--green)">The ghost runs on phones now.</strong>
+    </p>
+
+    <p>This is Issue #2 of <em>The Persistent Ghost</em>. Last week we introduced SpookyJuice and the persistent memory architecture. This week we took a $499 Google Pixel 10a — fresh off the shelf at Best Buy, day one of retail availability — and turned it into an always-on OpenClaw edge node. No root. No bootloader unlock. Just software.</p>
+
+    <p>What follows is the full build log: the device, the install path, the eight errors we hit, and the working solution. This is real. Every error came from a real terminal on a real phone. Every fix was discovered the hard way.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ THE DEVICE ══ -->
+  <section>
+    <div class="section-header">
+      <h2>The Hardware: Pixel 10a</h2>
+      <span class="section-pill pill-green">Build</span>
+    </div>
+
+    <p>The Pixel 10a launched March 5, 2026. We picked one up at Best Buy for $499 — 128GB, unlocked. Here's what's inside:</p>
+
+    <table class="spec-table">
+      <tr><th>Spec</th><th>Value</th></tr>
+      <tr><td>SoC</td><td>Google Tensor G4 (Samsung Exynos-based, codename <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:12px">zumapro</code>)</td></tr>
+      <tr><td>CPU</td><td>4× Cortex-A520 + 3× Cortex-A725 + 1× Cortex-X4 (8 cores)</td></tr>
+      <tr><td>RAM</td><td>8 GB (7,737,544 kB reported by kernel)</td></tr>
+      <tr><td>Storage</td><td>128 GB UFS 3.1 — 213 GB available after Android</td></tr>
+      <tr><td>OS</td><td>Android 16 (Build BD6A.251031.001.A4)</td></tr>
+      <tr><td>Kernel</td><td>Linux 6.1.145-android14-11 (aarch64, SMP PREEMPT)</td></tr>
+      <tr><td>Battery</td><td>5,100 mAh Li-ion — runs all day on a single charge</td></tr>
+      <tr><td>Updates</td><td>7 years guaranteed from Google</td></tr>
+      <tr><td>Price</td><td>$499 (Best Buy, unlocked)</td></tr>
+    </table>
+
+    <div class="highlight-block" style="border-left-color:var(--cyan)">
+      <p><strong style="color:var(--cyan)">Why a phone?</strong> For edge AI deployment — drone operations, field nodes, portable gateways — a phone gives you compute + camera + microphone + GPS + cellular + battery backup in one package for $499. No separate modem, no GPS module, no camera board. It's the highest sensor-density compute platform you can buy at this price point.</p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ DEEP DIVE: THE INSTALL ══ -->
+  <section>
+    <div class="section-header">
+      <h2>Deep Dive: The Install Path</h2>
+      <span class="section-pill pill-cyan">Research</span>
+    </div>
+
+    <p>The goal was simple: get OpenClaw running as a persistent AI gateway on the phone. The path was not. Here's the architecture we landed on:</p>
+
+    <div class="code-block">
+      <div style="color:var(--green);margin-bottom:12px;font-size:11px;letter-spacing:0.1em;">
+        ░░ WORKING INSTALL STACK ░░ (bottom → top)
+      </div>
+      <span class="comment"># Layer 1: Android 16 (Pixel 10a hardware)</span><br/>
+      <span class="comment"># Layer 2: Termux v0.118.3 (terminal emulator, no root)</span><br/>
+      <span class="comment"># Layer 3: proot-distro Ubuntu (userspace syscall interception)</span><br/>
+      <span class="comment"># Layer 4: NodeSource Node.js 22+ (glibc-compatible)</span><br/>
+      <span class="comment"># Layer 5: OpenClaw 2026.3.2</span><br/>
+      <br/>
+      <span class="cmd">pkg install -y proot-distro</span><br/>
+      <span class="cmd">proot-distro install ubuntu</span><br/>
+      <span class="cmd">proot-distro login ubuntu</span><br/>
+      <br/>
+      <span class="comment"># Inside Ubuntu:</span><br/>
+      <span class="cmd">curl <span class="flag">-fsSL</span> https://deb.nodesource.com/setup_22.x | bash -</span><br/>
+      <span class="cmd">apt install <span class="flag">-y</span> nodejs</span><br/>
+      <span class="cmd">npm config set cache /tmp/npm-cache</span><br/>
+      <span class="cmd">npm install <span class="flag">-g</span> openclaw</span><br/>
+    </div>
+
+    <p>The key insight: <strong style="color:var(--text)">you can't use Termux's native environment for anything with native C modules.</strong> Termux uses Android's Bionic libc instead of GNU glibc, and build tools like <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:12px">make</code> break in ways that are genuinely surreal — running <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:12px">make</code> dumps its help text instead of building because the argument parser is fundamentally different.</p>
+
+    <p>The fix is <strong style="color:var(--text)">proot-distro</strong> — a userspace <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:12px">chroot</code> that runs full Ubuntu inside Termux via <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:12px">ptrace</code> syscall interception. No root. ~500MB disk. Full glibc. Everything just works.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ ANDROID POWER MANAGEMENT ══ -->
+  <section>
+    <div class="section-header">
+      <h2>Defeating Android's 5 Kill Layers</h2>
+      <span class="section-pill pill-orange">Infrastructure</span>
+    </div>
+
+    <p>Android does not want you running background processes. It has five separate layers of power management, each independently capable of killing your app. For 24/7 operation, you have to defeat all of them:</p>
+
+    <div class="power-viz">
+      <div style="color:var(--orange);margin-bottom:12px;font-size:11px;letter-spacing:0.1em;">
+        ░░ ANDROID POWER MANAGEMENT LAYERS ░░
+      </div>
+      <div class="pv-layer">
+        <span class="pv-num">5</span>
+        <div class="pv-bar" style="width:180px;background:linear-gradient(90deg,var(--red),var(--orange))"></div>
+        <span class="pv-label">Doze — defers network, jobs, alarms</span>
+        <span class="pv-fix">deviceidle whitelist</span>
+      </div>
+      <div class="pv-layer">
+        <span class="pv-num">4</span>
+        <div class="pv-bar" style="width:150px;background:var(--orange)"></div>
+        <span class="pv-label">App Standby — throttles "unused" apps</span>
+        <span class="pv-fix">RUN_IN_BACKGROUND</span>
+      </div>
+      <div class="pv-layer">
+        <span class="pv-num">3</span>
+        <div class="pv-bar" style="width:120px;background:var(--purple)"></div>
+        <span class="pv-label">Adaptive Battery — ML-based kill prediction</span>
+        <span class="pv-fix">Unrestricted setting</span>
+      </div>
+      <div class="pv-layer">
+        <span class="pv-num">2</span>
+        <div class="pv-bar" style="width:90px;background:var(--cyan)"></div>
+        <span class="pv-label">CPU Freeze — kernel suspends processor</span>
+        <span class="pv-fix">Termux Wake Lock</span>
+      </div>
+      <div class="pv-layer">
+        <span class="pv-num">1</span>
+        <div class="pv-bar" style="width:60px;background:var(--text-faint)"></div>
+        <span class="pv-label">WiFi Sleep — disconnects when screen off</span>
+        <span class="pv-fix">wifi_sleep_policy 2</span>
+      </div>
+    </div>
+
+    <div class="highlight-block" style="border-left-color:var(--orange)">
+      <p><strong style="color:var(--orange)">The ADB commands are copy-paste ready</strong> in the full guide on GitHub. Five commands from your Mac, two manual toggles on the phone, and Android stops trying to kill your process. Every command has a verification step so you can confirm each layer is actually disabled.</p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ THE ERRORS ══ -->
+  <section>
+    <div class="section-header">
+      <h2>The Error Log: 8 Failures, 8 Fixes</h2>
+      <span class="section-pill pill-red">Debug</span>
+    </div>
+
+    <p>We hit every wall so you don't have to. Here's the full error log from the install session, with root causes and fixes:</p>
+
+    <div class="error-card error-fail">
+      <div class="error-num fail">ERROR 01</div>
+      <h4><code>npm error syscall spawn git</code></h4>
+      <p>npm needs git to resolve dependencies. Termux ships without it. <strong style="color:var(--green)">Fix:</strong> <code>pkg install -y git</code></p>
+    </div>
+
+    <div class="error-card error-fail">
+      <div class="error-num fail">ERROR 02</div>
+      <h4><code>CMake does not seem to be available</code></h4>
+      <p>koffi (FFI library) needs to compile from source — no prebuilt binary for Android. <strong style="color:var(--green)">Fix:</strong> <code>pkg install -y cmake make clang</code></p>
+    </div>
+
+    <div class="error-card error-fail">
+      <div class="error-num fail">ERROR 03 — THE WALL</div>
+      <h4><code>Failed to run build step</code> — make dumps help text</h4>
+      <p>Termux's make binary parses arguments differently than GNU make. Bionic libc ≠ glibc. Hardcoded paths mismatch. <strong style="color:var(--green)">Fix:</strong> Abandon native Termux. Use <code>proot-distro</code> Ubuntu.</p>
+    </div>
+
+    <div class="error-card error-fix">
+      <div class="error-num fix">ERROR 04</div>
+      <h4><code>ENOENT: rename</code> in npm cache</h4>
+      <p>proot can't emulate cross-filesystem <code>rename()</code> syscall. npm atomically renames from temp to cache across FS boundaries. <strong style="color:var(--green)">Fix:</strong> <code>npm config set cache /tmp/npm-cache</code> — same FS, no cross-FS rename.</p>
+    </div>
+
+    <div class="error-card error-fix">
+      <div class="error-num fix">ERROR 05</div>
+      <h4>Node.js version too old</h4>
+      <p>Ubuntu default repos ship ancient Node.js. OpenClaw requires ≥ 22.12. <strong style="color:var(--green)">Fix:</strong> Install via NodeSource <code>setup_22.x</code>.</p>
+    </div>
+
+    <div class="error-card error-fix">
+      <div class="error-num fix">ERRORS 06–08</div>
+      <h4>Screen timeout, process killing, SecurityException</h4>
+      <p>Screen goes black during install → <code>svc power stayon usb</code>. Background processes killed → whitelist + wakelock. <code>device_config put</code> needs root → manual Settings toggle instead.</p>
+    </div>
+
+    <div class="highlight-block">
+      <p><strong style="color:var(--purple)">Total time:</strong> ~2 hours to find the working path. ~15 minutes to execute it once you know what to do. The guide has a copy-paste "happy path" at the bottom for the 15-minute version.</p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ GITHUB CARD ══ -->
+  <section>
+    <div class="section-header">
+      <h2>The Full Guide</h2>
+      <span class="section-pill pill-purple">Open Source</span>
+    </div>
+
+    <p>The complete install guide — 645 lines of documentation with every command, every error, every screenshot — is open source on GitHub. Use it, fork it, improve it.</p>
+
+    <div class="github-card">
+      <div class="github-label">📂 GitHub · Open Source</div>
+      <h3>OpenClaw on Pixel 10a — Install Guide</h3>
+      <p>Step-by-step install documentation from a live session on launch day. Includes device specs, 8 errors with root cause analysis, ADB optimization commands, 860 lines of raw device property dumps, and 6 annotated screenshots.</p>
+      <div class="tag-row">
+        <span class="tag">pixel-10a</span>
+        <span class="tag">openclaw</span>
+        <span class="tag">termux</span>
+        <span class="tag">proot</span>
+        <span class="tag">edge-ai</span>
+        <span class="tag">arm64</span>
+      </div>
+      <a class="btn btn-outline-purple" href="https://github.com/spookyjuiceai/openclaw-pixel10a-guide" target="_blank">
+        View on GitHub →
+      </a>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ SSH + TAILSCALE ══ -->
+  <section>
+    <div class="section-header">
+      <h2>Phase 2: SSH + Tailscale</h2>
+      <span class="section-pill pill-cyan">Networking</span>
+    </div>
+
+    <p>Installing OpenClaw is step one. Step two is <strong style="color:var(--text)">never touching the phone again.</strong> SSH gives you remote shell access. Tailscale gives you a stable IP that works from anywhere.</p>
+
+    <div class="code-block">
+      <div style="color:var(--cyan);margin-bottom:12px;font-size:11px;letter-spacing:0.1em;">
+        ░░ SSH SETUP (in Termux on phone) ░░
+      </div>
+      <span class="cmd">pkg install <span class="flag">-y</span> openssh</span><br/>
+      <span class="cmd">passwd</span> <span class="comment"># set a password</span><br/>
+      <span class="cmd">sshd</span> <span class="comment"># start SSH daemon on port 8022</span><br/>
+      <br/>
+      <div style="color:var(--cyan);margin-bottom:12px;font-size:11px;letter-spacing:0.1em;">
+        ░░ KEY-BASED AUTH (from your Mac) ░░
+      </div>
+      <span class="cmd">ssh-copy-id <span class="flag">-p 8022</span> u0_aXXX@&lt;phone-ip&gt;</span><br/>
+      <br/>
+      <div style="color:var(--cyan);margin-bottom:12px;font-size:11px;letter-spacing:0.1em;">
+        ░░ SSH CONFIG (~/.ssh/config on Mac) ░░
+      </div>
+      <span class="comment">Host termux</span><br/>
+      <span class="comment">&nbsp;&nbsp;HostName 100.x.y.z</span> <span class="comment"># Tailscale IP</span><br/>
+      <span class="comment">&nbsp;&nbsp;Port 8022</span><br/>
+      <span class="comment">&nbsp;&nbsp;User u0_aXXX</span><br/>
+      <span class="comment">&nbsp;&nbsp;IdentityFile ~/.ssh/id_ed25519</span><br/>
+      <span class="comment">&nbsp;&nbsp;IdentitiesOnly yes</span><br/>
+    </div>
+
+    <p>Install <strong style="color:var(--text)">Tailscale</strong> from the Play Store on the phone. Sign in. The phone gets a stable <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:12px">100.x.y.z</code> IP that works from anywhere — home, coffee shop, cellular. Set Android VPN to "Always-on" so Tailscale survives reboots.</p>
+
+    <p>Result: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:12px">ssh termux</code> from any machine on your tailnet. No IP hunting. No port forwarding. Encrypted by default.</p>
+
+    <div class="highlight-block" style="border-left-color:var(--cyan)">
+      <p><strong style="color:var(--cyan)">Pro tip:</strong> Use <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:12px">IdentitiesOnly yes</code> in your SSH config. Without it, SSH offers every key in your agent to the server — if you have more than a few keys, the server rejects you for "too many authentication failures" before it ever tries the right one.</p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ WORKFLOWS & USE CASES ══ -->
+  <section>
+    <div class="section-header">
+      <h2>10 Things Your Phone Can Do Now</h2>
+      <span class="section-pill pill-green">Workflows</span>
+    </div>
+
+    <p>A $499 phone running OpenClaw with SSH and Tailscale isn't a toy. It's a <strong style="color:var(--text)">portable, always-on AI operations center</strong> that fits in your pocket. Here's what you can actually do with it:</p>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3><div class="icon">💬</div> Mobile Command Center</h3>
+        <p>Send tasks from Telegram, WhatsApp, Discord, Signal, or Slack. The phone executes — queries APIs, searches the web, drafts emails, manages files — and replies on the same channel. You never touch the phone.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">🔧</div> Remote DevOps</h3>
+        <p>Check server health, tail logs, restart services, deploy code — all from a chat message. OpenClaw SSHs into your infrastructure and returns results to your phone. Incident response from the gym.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">⏰</div> Scheduled Automation</h3>
+        <p>Morning briefings at 8 AM. End-of-day summaries at 6 PM. Weekly status reports on Fridays. OpenClaw's cron system runs tasks on schedule and delivers results to any channel.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">📷</div> Field Vision + Analysis</h3>
+        <p>The Pixel 10a's camera is accessible as an OpenClaw node tool. Photograph a site, whiteboard, receipt, or piece of equipment — the agent analyzes and returns structured data.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">🌐</div> Browser Automation</h3>
+        <p>Book courts, order groceries, check bank balances, scrape data — Playwright headless browser runs on the gateway host and the phone relays commands. Automate anything with a web interface.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">✈️</div> Portable Travel Gateway</h3>
+        <p>All channels work over cellular. Tailscale keeps your tailnet live. Battery lasts all day. USB-C PD charges forever. A 24/7 AI gateway that goes through airport security.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">🧠</div> Personal Knowledge Base</h3>
+        <p>"Remember that the Q2 budget is $45k." "What did I decide about the migration?" OpenClaw's 7-layer memory architecture persists across sessions. The phone never forgets.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">🏠</div> Home Automation Hub</h3>
+        <p>Control lights, thermostat, robot vacuum, garage door — natural language commands via any channel. Integrates with Home Assistant or direct device APIs.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">🔗</div> Webhook Receiver</h3>
+        <p>With Tailscale Funnel, the phone gets a public HTTPS endpoint. GitHub, Stripe, monitoring alerts — external services POST to your phone and OpenClaw processes them in real time.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">📡</div> Multi-Node Architecture</h3>
+        <p>Phone provides camera, GPS, mic, and cellular. Mac/VPS provides compute and storage. Both nodes talk over the OpenClaw WebSocket protocol. Distributed AI across your devices.</p>
+      </div>
+    </div>
+
+    <div class="highlight-block">
+      <p><strong style="color:var(--purple)">The pattern:</strong> install once, configure channels, set up SSH + Tailscale. Then manage everything from whatever app you already use. The phone is infrastructure, not an interface.</p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ WHAT'S NEXT ══ -->
+  <section>
+    <div class="section-header">
+      <h2>What's Next</h2>
+      <span class="section-pill pill-green">Roadmap</span>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3><div class="icon">⚡</div> Tensor G4 Benchmarks</h3>
+        <p>Inference performance testing on the Tensor G4 — latency, throughput, and power consumption for local model execution. How much AI can a phone actually run?</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">📡</div> Cellular Failover</h3>
+        <p>Testing OpenClaw's behavior when WiFi drops and the phone falls back to cellular. Latency spikes, reconnection handling, and queue management for unreliable networks.</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">📷</div> Headless Camera Access</h3>
+        <p>Accessing the Pixel 10a's camera from inside proot for computer vision workloads. Termux:API, v4l2, and the Android camera HAL — which path actually works?</p>
+      </div>
+      <div class="feature-card">
+        <h3><div class="icon">🧠</div> SpookyJuiceMemoryEngine™</h3>
+        <p>The modular, plug-in memory layer we teased in Issue #1. Full architecture drop coming. Designed to solve the memory problem across agent runtimes, not just OpenClaw.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ EMAIL CAPTURE ══ -->
+  <section class="capture-section">
+    <h2>Stay in the Loop</h2>
+    <p>The Persistent Ghost ships every week — build logs, architecture deep dives, and field notes from running AI agents on phones. No fluff. No filler.</p>
+    <form class="capture-form" id="subscribe-form" onsubmit="return handleSubscribe(event)">
+      <input type="email" id="subscribe-email" placeholder="your@email.com" required />
+      <button type="submit" class="btn btn-green" id="subscribe-btn">Subscribe</button>
+    </form>
+    <p class="capture-note" id="subscribe-status">No spam. Unsubscribe anytime. The ghost only haunts your inbox with good content.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ CONNECT ══ -->
+  <section class="connect-section">
+    <div class="section-header">
+      <h2>Connect With SpookyJuice</h2>
+      <span class="section-pill pill-green">Community</span>
+    </div>
+
+    <div class="social-grid">
+      <a class="social-card" href="https://x.com/SpookyJuiceAI" target="_blank">
+        <div class="social-icon">𝕏</div>
+        <div class="social-name">Twitter / X</div>
+        <div class="social-handle">@SpookyJuiceAI</div>
+      </a>
+      <a class="social-card" href="https://youtube.com/@SpookyJuiceAI" target="_blank">
+        <div class="social-icon">📺</div>
+        <div class="social-name">YouTube</div>
+        <div class="social-handle">@SpookyJuiceAI</div>
+      </a>
+      <a class="social-card" href="https://instagram.com/SpookyJuiceAI" target="_blank">
+        <div class="social-icon">📱</div>
+        <div class="social-name">Instagram</div>
+        <div class="social-handle">@SpookyJuiceAI</div>
+      </a>
+      <a class="social-card" href="https://tiktok.com/@SpookyJuiceAI" target="_blank">
+        <div class="social-icon">📲</div>
+        <div class="social-name">TikTok</div>
+        <div class="social-handle">@SpookyJuiceAI</div>
+      </a>
+      <a class="social-card" href="https://facebook.com/SpookyJuiceAI" target="_blank">
+        <div class="social-icon">📘</div>
+        <div class="social-name">Facebook</div>
+        <div class="social-handle">SpookyJuiceAI</div>
+      </a>
+      <a class="social-card" href="https://snapchat.com/add/spookyjuiceai" target="_blank">
+        <div class="social-icon">👻</div>
+        <div class="social-name">Snapchat</div>
+        <div class="social-handle">@spookyjuiceai</div>
+      </a>
+      <a class="social-card" href="https://github.com/spookyjuiceai/openclaw-pixel10a-guide" target="_blank">
+        <div class="social-icon">📂</div>
+        <div class="social-name">GitHub</div>
+        <div class="social-handle">Install Guide Repo</div>
+      </a>
+      <a class="social-card" href="https://spookyjuice.ai" target="_blank">
+        <div class="social-icon">🌐</div>
+        <div class="social-name">Website</div>
+        <div class="social-handle">spookyjuice.ai</div>
+      </a>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══ CLOSING ══ -->
+  <div class="closing-quote">
+    The ghost does not sleep.<br/>
+    The ghost does not forget.<br/>
+    The ghost fits in your pocket.
+    <strong>— SpookyJuice, Issue #2</strong>
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <footer class="footer">
+    <div class="footer-ghost">👻</div>
+    <div class="footer-brand">SpookyJuice</div>
+    <div class="footer-sub">A Persistent AI Agent Platform</div>
+    <div class="footer-links">
+      <a href="https://spookyjuice.ai" target="_blank">Website</a>
+      <a href="https://x.com/SpookyJuiceAI" target="_blank">X / Twitter</a>
+      <a href="https://youtube.com/@SpookyJuiceAI" target="_blank">YouTube</a>
+      <a href="https://instagram.com/SpookyJuiceAI" target="_blank">Instagram</a>
+      <a href="https://tiktok.com/@SpookyJuiceAI" target="_blank">TikTok</a>
+      <a href="https://facebook.com/SpookyJuiceAI" target="_blank">Facebook</a>
+      <a href="https://github.com/spookyjuiceai/openclaw-pixel10a-guide" target="_blank">GitHub</a>
+      <a href="https://spookyjuice.ai" target="_blank">Unsubscribe</a>
+    </div>
+    <div class="footer-legal">
+      You received this because you subscribed at <a href="https://spookyjuice.ai">spookyjuice.ai</a>.<br/>
+      © 2026 SpookyJuice · A Persistent AI Agent Platform<br/>
+      <a href="mailto:support@spookyjuice.ai">support@spookyjuice.ai</a> &nbsp;·&nbsp; <a href="https://x.com/SpookyJuiceAI">@SpookyJuiceAI</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+async function handleSubscribe(e) {
+  e.preventDefault();
+  const email = document.getElementById('subscribe-email').value.trim();
+  const btn = document.getElementById('subscribe-btn');
+  const status = document.getElementById('subscribe-status');
+  if (!email) return false;
+  btn.textContent = '...';
+  btn.style.pointerEvents = 'none';
+  try {
+    const res = await fetch('https://api.beehiiv.com/v2/publications/pub_98000f92-fc4d-42b6-aeb6-a1d21f2d7f82/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer cWGG8q8v5l9uH8FP5HmQ5XcFyEVuYWRZ9s6EdZawnzsBWb8wToQJdSXqLcT9RsfV' },
+      body: JSON.stringify({ email: email, send_welcome_email: true, utm_source: 'newsletter', utm_medium: 'issue-02' })
+    });
+    if (res.ok || res.status === 409) {
+      status.textContent = 'You\'re in. The ghost will find you.';
+      status.style.color = '#39ff14';
+      document.getElementById('subscribe-email').value = '';
+    } else {
+      status.textContent = 'Something went wrong. Try again?';
+      status.style.color = '#f472b6';
+    }
+  } catch {
+    status.textContent = 'Network error. Try again in a moment.';
+    status.style.color = '#f472b6';
+  }
+  btn.textContent = 'Subscribe';
+  btn.style.pointerEvents = 'auto';
+  return false;
+}
+</script>
+</body>
+</html>

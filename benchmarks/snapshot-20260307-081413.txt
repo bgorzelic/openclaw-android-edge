@@ -1,0 +1,60 @@
+# OpenClaw Pixel 10a Benchmark
+# Collected: 2026-03-07T16:14:14Z
+# Host: termux
+
+## Device
+kernel: 6.1.145-android14-11-gc1de4747ac59-ab14219743
+arch: aarch64
+node: v24.13.0
+openclaw: 2026.3.2
+
+## Memory
+total_bytes: 7923245056
+used_bytes: 5877358592
+free_bytes: 364441600
+available_bytes: 968986624
+used_pct: 74.2
+swap_total_bytes: 3961618432
+swap_used_bytes: 3946569728
+
+## Gateway Process
+pid: 26312
+status: running
+rss_kb: 1588
+rss_mb: 1
+vsz_kb: 10795984
+vsz_mb: 10542
+threads: 1
+open_fds: 3
+uptime_seconds: 435
+
+## Storage
+openclaw_config_kb: 486
+openclaw_install_kb: 655624
+disk_total_kb: 239542356
+disk_used_kb: 23984896
+disk_avail_kb: 215426388
+disk_used_pct: 11%
+
+## Gateway Latency
+http_latency_1_sec: 0.091096
+http_latency_2_sec: 0.052320
+http_latency_3_sec: 0.048745
+http_latency_4_sec: 0.051345
+http_latency_5_sec: 0.060278
+http_latency_avg_sec: 0.0608
+
+## Log Health
+log_lines: 24
+log_size_kb: 2
+error_count: 2
+warning_count: 0
+0
+connection_count: 5
+disconnection_count: 0
+0
+bonjour_spam_count: 0
+0
+
+## CPU (5-second sample)
+cpu_pct_5s: 0.00

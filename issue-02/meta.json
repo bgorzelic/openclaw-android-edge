@@ -1,0 +1,19 @@
+{
+  "issue_number": 2,
+  "title": "The Edge Node",
+  "subtitle": "A $499 phone becomes an always-on AI edge node. 8 errors, 8 fixes, 15 minutes. The ghost runs on phones now.",
+  "tags": ["pixel-10a", "edge-ai", "termux", "proot", "openclaw", "arm64", "android", "ssh", "tailscale", "workflows"],
+  "html_file": "the-persistent-ghost-issue-02.html",
+  "web_url": "https://spookyjuice.ai/newsletter/issue-02/",
+  "subject_line": "The Persistent Ghost — Issue #2: The Edge Node",
+  "preview_text": "We bought a phone. We made it a server. The ghost runs on phones now.",
+  "github_repo": "https://github.com/spookyjuiceai/openclaw-pixel10a-guide",
+  "x_thread": [
+    "The Persistent Ghost — Issue #2: The Edge Node\n\nWe bought a $499 Pixel 10a and turned it into an always-on AI edge node running OpenClaw. No root. No bootloader unlock.\n\n8 errors. 8 fixes. 15 minutes once you know the path.\n\nFull build log:",
+    "The install path that actually works:\n\nTermux → proot-distro Ubuntu → NodeSource Node.js 22 → OpenClaw\n\nNative Termux fails because koffi's C modules can't compile against Bionic libc. proot gives you real glibc via userspace syscall interception. No root needed.",
+    "Phase 2: SSH + Tailscale.\n\nInstall openssh in Termux. Set up key-based auth. Install Tailscale from Play Store.\n\nResult: `ssh termux` from anywhere. Stable 100.x.y.z IP that never changes. Encrypted. No port forwarding.\n\nThe phone becomes infrastructure you never touch.",
+    "10 workflows your pocket server now supports:\n\n• Mobile command center (any chat → phone executes)\n• Remote DevOps (incident response from the gym)\n• Scheduled automation (cron briefings)\n• Field vision + AI analysis\n• Browser automation\n• Portable travel gateway\n• Personal knowledge base\n• Home automation hub\n• Webhook receiver\n• Multi-node architecture",
+    "Full guide on GitHub — SSH setup, Tailscale networking, 10 workflows, 8 documented errors, 6 screenshots.\n\nSubscribe to The Persistent Ghost at spookyjuice.ai\n\nThe ghost does not sleep.\nThe ghost does not forget.\nThe ghost fits in your pocket."
+  ],
+  "discord_message": "📰 **The Persistent Ghost — Issue #2: The Edge Node**\n\nWe turned a $499 Pixel 10a into an always-on OpenClaw edge node. No root, no bootloader unlock. Full build log with 8 errors and 8 fixes.\n\n→ Full guide on GitHub\n→ Subscribe: spookyjuice.ai\n\nThe ghost fits in your pocket now. React 👻 if you read it!"
+}
