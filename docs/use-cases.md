@@ -2,499 +2,566 @@
 
 > **Author:** Brian Gorzelic / AI Aerial Solutions
 > **Last Updated:** March 2026
+> **Device:** Google Pixel 10a -- Tensor G4, 8GB RAM, $349
 
-These are real-world deployment patterns for an always-on AI gateway running on a Pixel 10a. They are organized from simplest to most sophisticated. Each entry explains what the use case is, how the system actually executes it, why a phone is a better substrate than a cloud VM for this particular pattern, and a concrete example workflow.
+These are real-world deployment patterns for an always-on AI gateway running on a Pixel 10a. Each use case describes a real problem, explains how the architecture solves it, provides configuration or command examples where applicable, and is honest about current limitations.
 
-These are not speculative capabilities. They reflect the actual architecture described in [docs/architecture.md](./architecture.md): a Node.js WebSocket gateway running in Termux, relaying to OpenRouter cloud inference, accessible via SSH over Tailscale from anywhere.
+The system described here is a Node.js WebSocket gateway running in Termux on the phone, relaying to cloud inference via OpenRouter. The phone performs no local inference. Gateway RSS is 323 MB, idle CPU is 0%, HTTP latency is 65ms on loopback. Remote access is via SSH tunnel over Tailscale. The gateway binds to loopback only on port 18789. Monthly operating cost is $5-15 in API tokens.
+
+For architecture details, see [docs/architecture.md](./architecture.md). For installation, see [INSTALL-GUIDE.md](../INSTALL-GUIDE.md). For performance tuning, see [OPTIMIZATION-GUIDE.md](../OPTIMIZATION-GUIDE.md).
 
 ---
 
 ## Table of Contents
 
-1. [24/7 Personal Assistant](#1-247-personal-assistant)
-2. [Home Automation Hub](#2-home-automation-hub)
-3. [Development Companion](#3-development-companion)
-4. [Field Data Collector](#4-field-data-collector)
-5. [Notification Triage](#5-notification-triage)
-6. [Content Pipeline](#6-content-pipeline)
-7. [Personal API Gateway](#7-personal-api-gateway)
-8. [Emergency Infrastructure Fallback](#8-emergency-infrastructure-fallback)
-9. [Multi-Agent Relay](#9-multi-agent-relay)
-10. [Learning Tutor with Persistent Context](#10-learning-tutor-with-persistent-context)
+1. [24/7 Personal AI Assistant](#1-247-personal-ai-assistant)
+2. [Mobile Command Center](#2-mobile-command-center)
+3. [Field Data Collection](#3-field-data-collection)
+4. [Home Automation Hub](#4-home-automation-hub)
+5. [Scheduled Content Pipeline](#5-scheduled-content-pipeline)
+6. [Multi-Node Relay](#6-multi-node-relay)
+7. [Privacy-First Personal AI](#7-privacy-first-personal-ai)
+8. [Development Companion](#8-development-companion)
 
 ---
 
-## 1. 24/7 Personal Assistant
+## 1. 24/7 Personal AI Assistant
 
-### What It Is
+### Why It Matters
 
-A single AI assistant reachable from any messaging platform you already use — WhatsApp, Telegram, Slack, Discord, Signal — that maintains memory of past conversations, can take actions on your behalf, and is never asleep. Unlike ChatGPT or Claude.ai accessed through a browser, this assistant lives on hardware you own, persists session state locally, and is reachable through your existing communication apps.
+You want to message an AI assistant the same way you message a person -- through Telegram, WhatsApp, or Signal -- and get a response in seconds, any time of day or night. Browser-based AI tools (ChatGPT, Claude.ai) require opening a laptop, navigating to a URL, and managing sessions manually. They do not integrate with the communication channels you already have open on your phone and watch.
 
-### How It Works
+A phone-based gateway gives you AI access through the messaging apps you already use, with persistent session memory that survives across conversations and device switches.
 
-OpenClaw maintains persistent connections to your messaging channels. When you send a message to the WhatsApp number or Telegram bot linked to your gateway, the message arrives at the gateway over the platform's webhook or long-polling connection. The gateway routes it to the appropriate agent session, sends the conversation context to the configured model via OpenRouter, receives the response, and replies on the same channel within seconds.
+### How It Works Architecturally
 
-Session state — conversation history, active skills, configured context — is stored in `~/.openclaw/` on the device. It survives reboots. Memory across sessions is provided by OpenClaw's layered memory architecture, which extracts and stores important facts, decisions, and preferences in a retrieval index.
+OpenClaw's channel connectors maintain persistent connections to messaging platforms. When a message arrives (via Telegram's long-polling API, WhatsApp Business webhook, etc.), the gateway routes it to the active agent session, appends it to the conversation context, sends the full context to the configured model via OpenRouter, and relays the response back through the same channel.
 
-### Why a Phone
+```
+Telegram/WhatsApp message
+  --> Channel connector (in-process)
+    --> Agent session (context + memory)
+      --> HTTPS POST to api.openrouter.ai
+        --> Model response
+          --> Reply via same channel
+```
 
-A phone is already permanently on, permanently connected, and already has accounts on every messaging platform. A cloud VM has none of these properties without additional configuration. The phone's cellular radio provides connectivity even when home WiFi is unavailable.
+Session state is stored in `~/.openclaw/` on the phone and persists across gateway restarts. The default model is `openrouter/anthropic/claude-3.5-haiku`, which handles most conversational tasks at ~$0.25 per million input tokens.
 
-More practically: you are already using your phone as the endpoint for all your messaging apps. Running the assistant on the same device as the accounts it manages eliminates one network hop and keeps message data on hardware you control.
+### Example Configuration
 
-### Example Workflow
+Telegram bot setup (after creating a bot via @BotFather):
 
-You are at a meeting. Your laptop is closed. You open WhatsApp and type:
+```bash
+# Set the Telegram bot token
+openclaw config set channels.telegram.token "YOUR_BOT_TOKEN"
 
-> "What's on my calendar this afternoon and do I have anything conflicting with the 3pm?"
+# Enable the Telegram channel
+openclaw config set channels.telegram.enabled true
 
-The gateway, running on the Pixel 10a on your desk at home, receives this via the WhatsApp channel connector. It calls a calendar tool (Google Calendar API, with credentials stored locally), retrieves your afternoon schedule, checks for conflicts, and replies in WhatsApp within 3-4 seconds — formatted as a simple list, no markdown syntax, because you configured the WhatsApp channel to use plain text output.
+# Restart the gateway
+openclaw gateway restart
+```
 
-You reply:
+From any device, message your Telegram bot:
 
-> "Move the 3pm to tomorrow morning, first available slot after 9"
+> "What's the weather forecast for San Francisco this week?"
 
-The assistant calls the calendar tool with write permissions, finds the next available slot, creates the new event, deletes the old one, and confirms the change in WhatsApp.
+The gateway processes the message, calls the configured weather tool (or asks the model to reason about it), and replies in the Telegram chat within 2-5 seconds.
 
-You did not open a laptop. You did not open a browser. You used the messaging app you already had open.
+### Limitations and Caveats
 
----
-
-## 2. Home Automation Hub
-
-### What It Is
-
-Natural-language control of smart home devices via any messaging channel, with context-aware behavior based on time, presence, and recent conversation history. Not a replacement for Home Assistant — a natural-language interface layered on top of it.
-
-### How It Works
-
-OpenClaw skills (tool definitions) wrap the Home Assistant REST API or directly call device APIs (Philips Hue, Nest, LIFX, etc.). When you send a command through any channel, the model interprets intent, selects the appropriate tool, and calls the API. The response confirms the action.
-
-Because the gateway runs on a phone on your home network, it has direct local network access to devices. No cloud routing is required for local API calls. A command like "turn off the kitchen lights" resolves to a direct HTTP call to your Home Assistant instance on the local network — the only cloud hop is the OpenRouter inference call to interpret the command and construct the API request.
-
-Conditional and contextual commands work because the model has conversation history and can call multiple tools in sequence:
-
-- "Turn on the living room lights but make it dim, we're watching a movie" — calls Hue API with brightness 20%, warm color temperature
-- "Good night" — calls a Home Assistant scene that locks doors, dims hallway lights to 5%, sets thermostat to sleep mode, and confirms any open windows
-- "Did I leave the garage door open?" — calls the garage API, checks state, responds yes/no
-
-### Why a Phone
-
-The phone sits on your home network permanently. It can reach local devices without traversing NAT or requiring port forwarding. A cloud VM cannot reach `192.168.1.x` addresses at all without a VPN tunnel back to your home network, adding latency and complexity.
-
-The phone's presence on the local network is a genuine architectural advantage, not just cost savings.
-
-### Example Workflow
-
-You wake up at 6:30am. Before getting out of bed, you open Telegram:
-
-> "Morning routine"
-
-The gateway executes a configured skill sequence:
-1. Calls Home Assistant to set bedroom lights to 40% warm white
-2. Calls thermostat API to raise heat to 70°F
-3. Calls Google Calendar to retrieve today's schedule
-4. Calls weather API for the local forecast
-5. Composes a brief briefing: current temperature, today's events, any calendar conflicts
-
-You respond:
-
-> "Skip the lights today, I want to sleep another 20 minutes"
-
-The assistant calls the Home Assistant API to reset the lights, sets a timer, and sends a message in 20 minutes:
-
-> "20 minutes up. Lights coming on now."
-
-Then executes the original light-on command. This kind of stateful, deferred action works because the session is persistent and running on always-on hardware.
+- **Channel connectors are planned, not shipped.** As of March 2026, Telegram and WhatsApp channel integration is on the roadmap (Issue #3). The gateway currently operates through the Canvas web UI and SSH. The architecture supports channels; the connectors are not yet wired up.
+- **WhatsApp Business API requires a Meta developer account** and phone number verification. It is not as simple as Telegram's bot API.
+- **Message latency is 1-5 seconds**, dominated by model inference time at the provider. The phone adds under 100ms.
+- **No voice messages yet.** Audio transcription via Whisper or similar is possible but not integrated.
+- **Context window limits apply.** Long conversations are managed by OpenClaw's safeguard compaction mode, but very long exchanges will lose early context.
 
 ---
 
-## 3. Development Companion
+## 2. Mobile Command Center
 
-### What It Is
+### Why It Matters
 
-An AI coding assistant that is always available over SSH, persists project context across sessions, and can access your actual development environment through tools — not just chat about code in the abstract.
+You are away from your desk -- at a conference, on a flight, at a client site -- and a production server starts throwing errors. You need to check logs, inspect service status, and possibly restart a process. Your laptop is in your bag or at the hotel. Your phone is in your pocket.
 
-### How It Works
+With the gateway running on the phone and accessible via SSH over Tailscale, you can connect from any device on your tailnet (including another phone or a borrowed laptop), ask the AI to inspect your infrastructure, and get actionable summaries without parsing raw log output yourself.
 
-You SSH into the Pixel 10a and enter the OpenClaw CLI, or you open the Canvas UI via SSH tunnel in your browser. The assistant has access to a shell tool (can execute commands), a file tool (can read and write files), and a web search tool. When you ask about a library, it can look up the documentation. When you ask it to check a function, it can read the file. When you ask it to run tests, it can execute them.
+### How It Works Architecturally
 
-This differs from a local AI assistant (like Claude in your IDE) in one important way: the context persists. When you close your laptop and come back the next day, the session history is still there. The assistant remembers what you were working on, what decisions you made, and what you tried that did not work.
+You SSH into the phone from any device on your Tailscale mesh network. The gateway has access to a shell tool that can execute commands, including SSH commands to other servers also on the tailnet. The model interprets your natural-language request, constructs the appropriate commands, executes them via the shell tool, and summarizes the results.
 
-The development companion use case does not require the phone to do significant computation. The phone relays your questions to a capable model (typically Claude Sonnet via OpenRouter, not Haiku) and returns responses. The phone's job is to be there and maintain state.
+```
+Your device (any)
+  --> SSH to Pixel 10a (via Tailscale, port 8022)
+    --> OpenClaw Canvas UI (localhost:18789 via port forward)
+      --> You: "Check if the API service is healthy on staging"
+        --> Gateway shell tool: ssh staging "systemctl status api-service"
+          --> Model summarizes the output
+```
 
-### Why a Phone
+The phone acts as a jump host with AI augmentation. It can reach any server on your tailnet, and the model can interpret the output of system commands far faster than you can scan raw logs on a phone screen.
 
-Persistence and availability. A local AI assistant in your IDE stops when you close your IDE. A cloud VM-based assistant could work, but you have to pay for it to be running continuously, and it does not have access to your local files without additional configuration.
+### Example Commands
 
-The phone is a different kind of always-on server: one that has already been paired with your identity (it is your phone), is already on your network, and costs nothing beyond its base hardware cost to keep running.
+SSH config on any client device:
 
-For developers working across multiple machines (desktop at home, laptop at the office or in the field), the phone provides a neutral common ground: every machine can SSH to the same gateway and resume the same context.
+```
+Host termux
+    HostName 100.x.y.z        # Tailscale stable IP
+    Port 8022
+    User u0_a314
+    IdentityFile ~/.ssh/id_ed25519
+    LocalForward 18789 127.0.0.1:18789
+    IdentitiesOnly yes
+```
 
-### Example Workflow
+Connect and query:
 
-You are working on a data pipeline. You have a Python script that is throwing an intermittent `KeyError`. You open the Canvas UI via SSH tunnel:
+```bash
+ssh termux
+# Open browser to http://127.0.0.1:18789/__openclaw__/canvas/
+```
 
-> "I'm getting a KeyError in `/src/pipeline/transform.py` around line 80. The input data is from the Salesforce API — can you look at the file and the error pattern and tell me what's happening?"
+In the Canvas:
 
-The assistant uses the file tool to read `transform.py`, inspects the logic, notices that the Salesforce API sometimes omits the `LastModifiedDate` field for archived records, and explains the root cause. It suggests a fix using `.get()` with a default value and shows the exact code change.
+> "SSH into the staging server and show me the last 50 lines of the API service log. Summarize any errors."
 
-You apply the fix and run the tests:
+The gateway runs `ssh staging "journalctl -u api-service -n 50 --no-pager"`, feeds the output to the model, and returns a structured summary: error count, error types, timestamps, and suggested actions.
 
-> "Run the tests in `/tests/test_transform.py` and tell me if the fix worked"
+For deeper investigation:
 
-The assistant uses the shell tool to execute `python -m pytest tests/test_transform.py -v` and returns the output. All tests pass.
+> "Check the database connection pool on staging. Is it exhausted?"
 
-The next morning, you SSH into the same gateway:
+The gateway runs the appropriate diagnostic commands (`pg_stat_activity` query, connection count check) and reports back.
 
-> "Where did we leave off yesterday?"
+### Limitations and Caveats
 
-The assistant summarizes the debugging session and the fix that was applied.
+- **Shell tool access is powerful and dangerous.** The gateway can execute any command the Termux user can run. There are no built-in guardrails preventing destructive commands. Use with awareness.
+- **SSH keys must be pre-configured.** The phone needs SSH key access to your infrastructure servers. Store keys in `~/.ssh/` on the Termux filesystem.
+- **Latency stacks.** Phone-to-OpenRouter for inference (1-4s) plus phone-to-server for command execution (depends on network). Expect 3-10 seconds for a full inspect-and-summarize cycle.
+- **Not a replacement for proper monitoring.** This is for ad-hoc investigation when you are away from your workstation. Use Datadog, Grafana, or PagerDuty for continuous monitoring and alerting.
+- **Cellular bandwidth matters.** Large log dumps over a cellular connection can be slow. Ask the model to filter or summarize rather than dumping raw output.
 
 ---
 
-## 4. Field Data Collector
+## 3. Field Data Collection
 
-### What It Is
+### Why It Matters
 
-An intelligent data capture system that uses the phone's camera, GPS, and microphone to collect, label, and structure field observations — replacing paper forms, manual spreadsheets, and after-the-fact transcription.
+Field workers -- site inspectors, surveyors, agricultural technicians, drone operators -- collect data using paper forms, disconnected apps, or manual spreadsheet entry after returning to the office. The gap between observation and structured data creates errors, delays, and lost context.
 
-### How It Works
+The Pixel 10a is already a sensor array: 50+ MP camera with OIS, GPS with meter-level accuracy, microphone, barometer, accelerometer. Pairing these sensors with AI interpretation via OpenClaw means you can photograph a piece of equipment, and the AI extracts structured data from the image -- condition, serial number, defect classification -- and writes it directly to a Google Sheet or local database. No manual transcription.
 
-The Pixel 10a is a phone. It has a 50+ megapixel camera with optical image stabilization, GPS with meter-level accuracy, a MEMS microphone, barometric pressure sensor, and accelerometer. These sensors are accessible from Termux via the Termux:API plugin.
+### How It Works Architecturally
 
-OpenClaw skills wrap `termux-camera-photo`, `termux-location`, `termux-microphone-record`, and `termux-tts-speak`. When you trigger a capture workflow (by voice, by tapping a shortcut, or by sending a Telegram message), the skill chain:
+OpenClaw skills wrap Termux:API commands (`termux-camera-photo`, `termux-location`, `termux-microphone-record`) to access the phone's hardware sensors. A capture workflow chains these together:
 
-1. Captures a photo or starts audio recording
-2. Reads the current GPS coordinates
-3. Sends the image and/or audio to the model with a structured extraction prompt
-4. Returns structured data (JSON, CSV row, or natural-language summary depending on configuration)
-5. Appends the result to a local file or pushes it to Google Sheets via the Sheets API
+```
+Trigger (Telegram message, voice command, or scheduled)
+  --> termux-camera-photo (captures image)
+  --> termux-location (reads GPS coordinates)
+  --> Send image + coordinates + prompt to vision-capable model
+      (e.g., openrouter/anthropic/claude-sonnet-4-5 or openrouter/google/gemini-2.5-pro)
+  --> Model returns structured JSON
+  --> Append to Google Sheets via Sheets API skill
+  --> Confirm via Telegram with summary
+```
 
-This is particularly useful for inspection workflows, site surveys, agriculture monitoring, and any field operation where structured data needs to be captured rapidly without a laptop.
-
-### Why a Phone
-
-The phone is already a sensor array. A cloud VM cannot take a photo. A Raspberry Pi can, but it requires a separate camera module, does not have cellular connectivity, and cannot send voice messages back to you through Telegram.
-
-The integration of sensors with AI interpretation is what makes this valuable. Taking a photo is easy. Having the AI automatically extract structured data from that photo — reading a meter value, identifying a plant disease, detecting a construction defect — and recording it to your database without any manual transcription is the actual value proposition.
+The model does the heavy lifting: reading meter values, identifying equipment conditions, classifying defects, extracting text from documents. The phone provides the raw sensor data and handles the orchestration.
 
 ### Example Workflow
 
-You are inspecting solar panel installations at a remote site. You open Telegram and start the inspection workflow:
+Solar panel inspection using Telegram as the interface:
 
-> "Start site inspection: Array B, Section 3"
+```
+You: "Start inspection: Array B, Section 3"
+Bot: "Inspection started. GPS: 40.7128, -74.0060. Timestamp: 2026-03-07T14:23:11Z.
+      Send photos with /photo or type observations."
 
-The gateway records the GPS coordinates and timestamps the session. For each panel, you photograph it from your phone camera:
+You: /photo
+[Camera captures image, sends to vision model]
 
-> /photo
-
-The skill captures a photo, sends it to Claude (a vision-capable model via OpenRouter), and receives a structured response:
-
-```json
-{
+Bot: {
   "panel_id": "B3-047",
   "condition": "soiling",
   "severity": "moderate",
   "estimated_efficiency_loss": "8-12%",
   "recommendation": "clean within 30 days",
-  "gps": [40.7128, -74.0060],
-  "timestamp": "2026-03-07T14:23:11Z"
+  "gps": [40.7128, -74.0060]
+}
+Appended to Sheet: "Array-B Inspections" row 48.
+
+You: "Generate summary for Section 3"
+Bot: "Section 3 summary: 12 panels inspected. 2 moderate soiling, 1 minor crack,
+      9 good condition. Estimated section efficiency: 94%. Full report attached."
+```
+
+### Limitations and Caveats
+
+- **Termux:API must be installed separately** from the Termux app. It is a companion APK that provides the bridge between Termux and Android's sensor APIs. Without it, `termux-camera-photo` and `termux-location` do not exist.
+- **Camera access from Termux is functional but limited.** The Termux camera interface does not support all camera modes (no Night Sight, no HDR+). Image quality is good but not what you get from the native camera app.
+- **Vision model costs are higher.** Sending images to the model uses significantly more tokens than text-only queries. A single image analysis with Claude Sonnet might cost $0.01-0.05 depending on image size and prompt length. Budget accordingly for high-volume inspections.
+- **GPS accuracy depends on conditions.** Indoors or in urban canyons, GPS accuracy degrades. The phone's location API uses WiFi and cell tower triangulation as fallbacks, but precision varies.
+- **Offline operation is not supported.** The phone must have cellular or WiFi connectivity to reach OpenRouter for inference. Captured images can be queued locally and processed when connectivity returns, but this requires custom skill development.
+- **This workflow is not yet packaged as a ready-to-use skill.** The individual components (camera, GPS, model, Sheets API) all work. Chaining them into a polished inspection workflow requires configuration. Expect to spend time on prompt engineering for your specific domain.
+
+---
+
+## 4. Home Automation Hub
+
+### Why It Matters
+
+Smart home control through dedicated apps (Hue, Nest, Ring) requires opening the right app for the right device. Voice assistants (Alexa, Google Home) work well for simple commands but struggle with conditional logic, multi-step sequences, and context ("do what I said yesterday"). Home Assistant provides power and flexibility but has a learning curve and a UI designed for dashboards, not conversation.
+
+A natural-language gateway layered on top of Home Assistant (or direct device APIs) lets you control your home through any messaging app with commands like "set the house up for movie night" -- and the AI figures out which devices to adjust and how.
+
+### How It Works Architecturally
+
+OpenClaw skills wrap the Home Assistant REST API or direct device APIs (Philips Hue, LIFX, Nest, etc.). The phone sits on your home network and can reach local devices at `192.168.x.x` without NAT traversal or cloud routing.
+
+```
+Telegram/WhatsApp message: "Good night"
+  --> Gateway interprets intent
+    --> HTTPS POST to api.openrouter.ai (intent classification + action planning)
+      --> Model returns tool calls:
+        1. home_assistant.call_service("scene.turn_on", entity_id="scene.goodnight")
+        2. home_assistant.call_service("lock.lock", entity_id="lock.front_door")
+        3. home_assistant.call_service("climate.set_temperature", temperature=67)
+    --> Gateway executes each tool call against Home Assistant API
+      --> Confirms: "Good night mode activated. Front door locked. Thermostat set to 67F."
+```
+
+The only cloud hop is the inference call to determine intent and construct the API requests. The actual device control calls are local HTTP requests from the phone to Home Assistant on the same network.
+
+### Example Configuration
+
+Home Assistant skill configuration in `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "skills": {
+    "home_assistant": {
+      "url": "http://192.168.1.100:8123",
+      "token": "YOUR_LONG_LIVED_ACCESS_TOKEN",
+      "entities": ["light.*", "climate.*", "lock.*", "scene.*", "cover.*"]
+    }
+  }
 }
 ```
 
-The gateway appends this to a Google Sheet automatically. You continue for each panel.
+Example commands via any messaging channel:
 
-At the end of the inspection:
+- "Turn on the living room lights at 40% warm white"
+- "Is the garage door open?"
+- "Set the thermostat to 72 when I get home" (requires presence detection integration)
+- "Movie night" (triggers a scene: dim lights, close blinds, set TV input)
 
-> "Generate summary report for Section 3"
+### Limitations and Caveats
 
-The assistant reads the session's captured data, counts defects by severity, calculates total estimated efficiency loss, and generates a PDF-ready Markdown report with recommendations. You send it to your client before you leave the site.
+- **Home Assistant integration is not built into OpenClaw.** You need to write or configure skills that wrap the HA REST API. This is straightforward but requires familiarity with both OpenClaw skills and Home Assistant's API.
+- **The phone must be on the same network as Home Assistant** for local API access. If you are away from home and send a command via Telegram, the phone (on home WiFi) can still reach HA locally. But if the phone is also away from home (e.g., you took it with you), it cannot reach local devices without a VPN back to the home network.
+- **Latency for device control is 2-5 seconds** because of the inference round trip. For time-critical commands (turning off an alarm), this is slower than a dedicated app or voice assistant.
+- **The AI can misinterpret ambiguous commands.** "Turn off everything" might include devices you did not intend. Use explicit entity naming or define safe defaults in your skill configuration.
+- **No built-in presence detection.** The phone does not automatically know when you arrive home. This requires integration with Home Assistant's presence detection or Tailscale's connectivity status as a proxy.
 
 ---
 
-## 5. Notification Triage
+## 5. Scheduled Content Pipeline
 
-### What It Is
+### Why It Matters
 
-Automated filtering, prioritization, and summarization of high-volume notifications — transforming the flood of messages, alerts, and updates into a structured digest of what actually requires your attention.
+Recurring information tasks consume time disproportionate to their value: checking email and calendar every morning, compiling weekly status reports from git commits, monitoring system alerts throughout the day. These tasks follow predictable patterns and can be automated with a cron-like scheduler that has access to AI for summarization and formatting.
 
-### How It Works
+An always-on phone gateway can execute these workflows on schedule without a laptop being open, delivering results to your preferred messaging channel.
 
-OpenClaw's channel connectors maintain read access to your messaging platforms. On a configurable schedule (or triggered by volume thresholds), the assistant reads unread messages across channels and produces a prioritized summary.
+### How It Works Architecturally
 
-The triage logic is defined by natural-language instruction in the system prompt rather than rigid rules. You can tell the assistant what matters: "anything from my manager or client is high priority, GitHub CI failures for main branch are high priority, marketing newsletters are low priority, LinkedIn notifications can be discarded." The model applies this intent flexibly.
+OpenClaw's cron system (planned) triggers skill sequences on a schedule. Each scheduled task is a message sent to the gateway's agent session at the specified time, which the model processes using available tools.
 
-Triage output can be delivered to any channel — a dedicated Telegram bot message, a Slack DM, an email via SendGrid — on whatever schedule you configure. The assistant can also take actions: marking emails as read, archiving low-priority Slack messages, or sending an acknowledgment reply.
+```
+Cron trigger (e.g., 8:00 AM daily)
+  --> Gateway receives scheduled message
+    --> Agent calls tools: calendar API, email API, weather API
+      --> Model composes morning briefing
+        --> Sends via Telegram/WhatsApp/Slack
+```
 
-### Why a Phone
+For content publishing workflows (the use case that drives this project), the pipeline is documented in [PUBLISH-PIPELINE.md](../PUBLISH-PIPELINE.md). The gateway reads source content, generates platform-specific versions (X thread, LinkedIn post, Reddit post, HN submission, Discord announcement), and can post to platforms with API access.
 
-Notification triage requires 24/7 connectivity to multiple services simultaneously. The phone maintains persistent WebSocket or long-polling connections to each messaging platform — the same connections that deliver your personal messages. A cloud VM can replicate this, but it requires you to grant API access to every platform and manage separate OAuth tokens for each. The phone already has active sessions.
+### Example Workflows
 
-The phone is also the device that receives notifications. Running triage on the device that receives the notifications eliminates network latency and avoids routing data through an additional cloud hop.
-
-### Example Workflow
-
-You configure a morning triage at 8:00am via OpenClaw's cron system:
+**Morning briefing (daily, 7:30 AM):**
 
 ```bash
-openclaw cron add --every "8:00 AM" \
-  --message "Triage all unread messages since yesterday 6pm.
-  High priority: anything from Sarah or the Apex client, any CI failures on main.
-  Medium: code review requests, calendar invites.
-  Low: newsletters, LinkedIn, non-urgent Slack threads.
-  Format: bullet list by priority. Flag anything requiring response today."
+openclaw cron add --at "7:30 AM" --channel telegram \
+  --message "Morning briefing:
+    1. Today's calendar events (flag conflicts)
+    2. Unread emails from VIPs (Sarah, Apex client, engineering leads)
+    3. Weather forecast for my location
+    4. Any CI/CD failures on main branch since yesterday
+    Format as a concise bullet list. Skip low-priority items."
 ```
 
-At 8:00am, the gateway reads unread messages across your Gmail, Slack, and Telegram accounts (using the respective API skills), runs the triage, and sends you a structured digest:
+**Weekly status report (Fridays, 4:00 PM):**
 
-```
-HIGH PRIORITY (requires action today):
-- Sarah (Slack, 11:32pm): Asks if you can move the Wednesday demo to 2pm. Reply needed.
-- Apex client (email, 8:45am): Requested updated proposal by EOD.
-- CI failure (GitHub, 12:15am): main branch — payment service build failing.
-
-MEDIUM PRIORITY:
-- 3 code review requests (GitHub): can review this afternoon.
-- 2 calendar invites: accepted automatically per your default rules.
-
-LOW PRIORITY (14 items): Skipped. Flag 'triage low' to see these.
+```bash
+openclaw cron add --at "Friday 4:00 PM" --channel slack \
+  --message "Generate weekly status report:
+    1. Git commits on main this week (group by author)
+    2. PRs merged (list with one-line summaries)
+    3. Open issues created vs closed
+    4. Deployment count
+    Format for pasting into Slack #engineering channel."
 ```
 
-You spend 30 seconds on a digest that would have taken 15 minutes to manually process.
+**Monitoring alert triage (every 2 hours):**
+
+```bash
+openclaw cron add --every "2h" --channel telegram \
+  --message "Check PagerDuty and Grafana for active alerts.
+    Ignore: disk space warnings under 80%, known flaky test alerts.
+    Report: anything new, anything escalated, anything unacknowledged.
+    If nothing actionable, reply 'All clear' and skip the details."
+```
+
+### Limitations and Caveats
+
+- **Cron scheduling is planned, not shipped.** As of March 2026, this is on the roadmap (Issue #3). You can simulate it with system-level cron in Termux (`crontab -e`) calling `curl` against the gateway, but native OpenClaw cron is not yet available.
+- **API access to email, calendar, and monitoring services requires separate configuration.** Each service needs OAuth tokens or API keys stored in the gateway's environment. Google Calendar and Gmail require OAuth2 with refresh tokens, which adds setup complexity.
+- **Scheduled tasks consume API tokens even when you don't read the output.** A morning briefing that costs $0.01 is negligible; a monitoring check every 2 hours that pulls large log volumes could add up. Tune prompts to minimize token usage.
+- **Time zone handling is manual.** Termux uses the phone's system time zone. If you travel, scheduled tasks fire at the local time of the phone, not your current location.
+- **Content publishing is partially manual.** Some platforms (Hacker News) have no posting API. Others (Beehiiv) require paid tiers for programmatic access. The pipeline generates the content; you may still need to paste and post manually for some channels.
 
 ---
 
-## 6. Content Pipeline
+## 6. Multi-Node Relay
 
-### What It Is
+### Why It Matters
 
-A structured workflow that takes a single piece of content — an article, a guide, a project update — and produces appropriately formatted versions for each publication channel: email newsletter, X/Twitter thread, LinkedIn post, Reddit post, Hacker News submission, Discord announcement.
+A single phone is useful. A phone alongside your Mac or a VPS creates a distributed system where each node contributes what it does best: the phone provides always-on availability, cellular failover, and physical sensors; the Mac provides compute power for heavy tasks; the VPS provides a stable public IP and high-bandwidth connectivity.
 
-### How It Works
+This matters when you want redundancy (if one node goes down, others keep working) or when different tasks benefit from different hardware (the phone captures photos for AI analysis while the Mac runs compute-intensive local models).
 
-This use case exists in this project. The [PUBLISH-PIPELINE.md](../PUBLISH-PIPELINE.md) documents the current manual process and planned automation. The gateway can partially automate this today and fully automate it with the planned skill set.
+### How It Works Architecturally
 
-The source content is an HTML file (or Markdown). The assistant reads the source, understands the platform constraints for each channel (X character limits and thread format, LinkedIn's algorithm preferences, Reddit's community norms, HN's terse submission style), and produces a draft for each. It then posts to each channel via the respective API skills.
-
-The pipeline is not fully automated yet — some platforms (Hacker News) have no API, and others (Beehiiv email) require an Enterprise subscription for programmatic posting. The current hybrid approach uses the assistant to generate all the per-channel content and human action to paste and post where APIs are unavailable.
-
-### Why a Phone
-
-The phone is the always-on orchestrator. Publishing does not happen all at once — it follows a cadence (email day 0, LinkedIn day 1, etc.). The phone can be told the cadence and execute it without a laptop being open. It also monitors for engagement signals (replies, comments) and can draft responses.
-
-This is a case where the always-on, always-connected nature of a phone is a direct operational advantage over a laptop or a cloud VM that only runs when actively managed.
-
-### Example Workflow
-
-You finish a technical write-up and push it to the guide repository. From Telegram:
-
-> "The new architecture doc is done. Generate publish content for issue 3."
-
-The gateway uses the file tool to read `docs/architecture.md`, then generates:
-- An X thread (5 tweets, hook-driven, code examples in screenshots)
-- A LinkedIn post (professional framing, no markdown, call to action)
-- A Reddit post for r/selfhosted (technical depth, honest about limitations)
-- A Hacker News submission title and first comment
-- A Discord announcement (shorter, community-focused)
-
-Each draft is sent to you as a Telegram message for review. You reply with edits or just "looks good, post it."
-
-The gateway posts the approved content to the channels with available APIs immediately. It schedules the remaining channels using OpenClaw's cron system to follow the publish cadence.
-
----
-
-## 7. Personal API Gateway
-
-### What It Is
-
-A stable, authenticated HTTP endpoint that other systems can call to trigger AI-powered actions, accepting webhooks from external services and routing them to appropriate handlers.
-
-### How It Works
-
-When configured with Tailscale Funnel or Tailscale Serve, the gateway gets a stable public HTTPS URL. External services can POST to this URL to trigger actions. The gateway authenticates requests (token-based) and dispatches them to the appropriate skill.
-
-Common webhook sources:
-- **GitHub** — push events, CI status, PR reviews
-- **Stripe** — payment events, subscription changes
-- **Monitoring systems** — PagerDuty, Datadog, Grafana alerts
-- **Custom scripts** — anything that can make an HTTP POST
-
-When a webhook arrives, the gateway can:
-- Parse the event payload
-- Decide what action to take (using the model or with a fixed rule)
-- Execute the action (send a Slack message, create a GitHub issue, call an API)
-- Reply to the webhook with a structured response
-
-The gateway can also serve as the endpoint for other AI systems or automation tools (n8n, Make, Zapier) that need a reliable AI backend without a per-seat SaaS subscription.
-
-### Why a Phone
-
-A phone's Tailscale node can use Tailscale Funnel to expose a port to the public internet without port forwarding or a static IP from your ISP. This is the only option for users on dynamic IP addresses (which is most residential internet customers) who want to receive webhooks without a cloud VM.
-
-The phone provides this without an additional $25-35/month cloud VM cost.
-
-### Example Workflow
-
-You configure GitHub to send push webhooks to your gateway's Tailscale Funnel URL:
+Each node runs its own OpenClaw gateway instance. Nodes discover each other via Tailscale's stable addressing and can forward tasks between themselves.
 
 ```
-https://pixel.tailnet-name.ts.net/webhooks/github
+Phone (Pixel 10a)                    Mac (Apple Silicon)
+  - Always-on availability            - Local inference (llama.cpp)
+  - Cellular failover                  - Heavy compute tasks
+  - Camera/GPS/sensors                 - Large context windows
+  - Telegram/WhatsApp channels         - IDE integration
+  - Gateway: 100.x.y.1:18789          - Gateway: 100.x.y.2:18789
+
+                    VPS (Optional)
+                      - Public IP for webhooks
+                      - High-bandwidth API calls
+                      - Gateway: 100.x.y.3:18789
 ```
 
-When your main branch receives a push, the gateway:
-1. Receives the webhook payload (commit list, author, diff stats)
-2. Calls the CI API to check if tests are passing
-3. If tests fail, sends a Slack message to the engineering channel with the failing test summary
-4. If tests pass, checks the commit messages for `fix:` or `feat:` prefixes and updates the changelog draft
+Task routing between nodes can be configured so that:
+- Simple queries stay on the phone (Haiku via OpenRouter)
+- Code analysis gets forwarded to the Mac (local Sonnet or Opus)
+- Webhook reception happens on the VPS (public IP, no Tailscale Funnel needed)
+- Sensor tasks (photo capture, location) always go to the phone
 
-This replaces a GitHub Actions workflow that would cost compute minutes, or a cloud function that would add operational complexity. The phone does it as a persistent webhook receiver at no marginal cost.
+### Example Configuration
 
----
+On the phone, configure awareness of other nodes:
 
-## 8. Emergency Infrastructure Fallback
+```json
+{
+  "discovery": {
+    "mdns": { "mode": "off" },
+    "peers": [
+      {
+        "name": "mac",
+        "url": "http://100.x.y.2:18789",
+        "capabilities": ["local-inference", "heavy-compute"]
+      },
+      {
+        "name": "vps",
+        "url": "http://100.x.y.3:18789",
+        "capabilities": ["public-ip", "webhooks"]
+      }
+    ]
+  }
+}
+```
 
-### What It Is
+From any device on the tailnet, the phone acts as the primary entry point. If it determines a task needs more compute than cloud inference provides, it can delegate to the Mac.
 
-A backup AI access path that remains operational when your primary infrastructure fails. When your laptop is unavailable, your home internet is down, your cloud services are having an incident, or you need to work from a location without your usual tools — the phone gateway on cellular keeps you operational.
+### Limitations and Caveats
 
-### How It Works
-
-The Pixel 10a has an LTE/5G radio independent of your home WiFi. When home internet fails, Tailscale reroutes through cellular — the SSH tunnel and gateway remain accessible from any device on your tailnet that also has internet connectivity. The phone becomes the only working AI endpoint in your environment.
-
-This use case is deliberately passive — it requires no additional configuration beyond the base setup. The redundancy is a property of the architecture, not a separate system.
-
-For more active fallback scenarios: the phone can receive alerts from monitoring systems (via the webhook gateway use case) and take autonomous actions even when you are not actively managing it. If your primary server goes down at 3am, the phone can detect the alert, diagnose the issue using SSH tools, and notify you with a summary before you wake up.
-
-### Why a Phone
-
-A phone is the canonical always-on device. It has its own battery, its own cellular connection, and its own independent failure domain from your home network and cloud services. No other category of personal device shares all these properties.
-
-A cloud VM fails if the cloud provider has an outage (or if you forget to pay the bill). A laptop fails when the power goes out or the WiFi dies. A phone survives both scenarios.
-
-### Example Workflow
-
-It is Saturday morning. Your home internet is down. A client emails asking for an urgent status update on a project.
-
-You have cellular on your phone and on your laptop via hotspot. You open the Canvas UI via SSH tunnel to the phone gateway — which routes over cellular, not home WiFi. From the Canvas:
-
-> "Pull the current status of the API service from the staging server and draft an update email for the client."
-
-The gateway uses SSH tools to connect to the staging server (also on your tailnet), runs `systemctl status api-service` and `journalctl -u api-service --since "1 hour ago"`, processes the output, and drafts a professional status update email. You review and send it.
-
-Your internet is still down. The client's situation is handled. The phone's cellular connection is the only thing that kept you operational.
+- **Multi-node orchestration is exploratory.** OpenClaw supports the concept of peer discovery and task forwarding, but the routing logic for automatically dispatching tasks to the right node is not mature. Expect to configure this manually.
+- **mDNS discovery does not work on Android.** Termux cannot send multicast packets (Android restricts multicast to privileged sockets). Peer discovery must use explicit configuration, not automatic network discovery. This is why the gateway config disables mDNS (`discovery.mdns.mode: off`).
+- **Network partitions break the relay.** If the phone loses connectivity to the Mac (home internet goes down but cellular stays up), tasks that require the Mac will fail. Design workflows with graceful fallback.
+- **State synchronization between nodes is not automatic.** Conversation history on the phone is not replicated to the Mac. Each node has its own session state. A conversation started on one node must continue on that node.
+- **Cost and complexity increase linearly** with each node. Each node needs its own OpenRouter key (or shared key), Tailscale setup, and monitoring. For most users, a single phone node is sufficient.
 
 ---
 
-## 9. Multi-Agent Relay
+## 7. Privacy-First Personal AI
 
-### What It Is
+### Why It Matters
 
-A routing layer that dispatches tasks to different AI models based on the nature of the request, enabling a mixed-model workflow where cheap fast models handle simple tasks and more capable models handle complex ones — without the user managing model selection manually.
+When you use ChatGPT or Claude.ai through a browser, your conversation data passes through the provider's infrastructure, is subject to their data retention policies, and may be used for model training (depending on your plan and settings). For sensitive personal data -- health questions, financial planning, legal research, private journaling -- this data exposure is a legitimate concern.
 
-### How It Works
+With an OpenClaw gateway on your phone, the architecture is different: conversation history, session state, tool results, and API keys never leave the device. The only data that crosses the network boundary is the conversation context sent to the model provider for each inference call, and the model's response coming back.
 
-OpenRouter provides access to 100+ models behind a single API. OpenClaw supports configuring routing rules that direct certain task types to specific models. The gateway evaluates incoming requests (by keyword, by channel, by a fast classifier model) and selects the appropriate model for each.
+### How It Works Architecturally
 
-A simple tiered approach:
-- **Triage and quick Q&A** → Claude 3.5 Haiku (~$0.25/1M tokens)
-- **Code and analysis** → Claude Sonnet 4.5 (~$3/1M tokens)
-- **Deep reasoning or long documents** → Claude Opus (~$15/1M tokens)
-- **Open source, no data retention** → Llama 3.1 70B via OpenRouter (~$0.35/1M tokens)
+```
+Data that stays on the phone (never leaves):
+  - ~/.openclaw/          Session state, conversation history, memory index
+  - ~/.openclaw/.env      API keys, tokens, credentials
+  - Tool results          Files read, commands executed, API responses
+  - Gateway config        Model selection, channel config, skill definitions
 
-A more sophisticated approach uses the gateway as an orchestrator: it receives a complex task, breaks it into subtasks, dispatches each subtask to the most appropriate model, collects results, and synthesizes a final response. This is the core pattern behind multi-agent frameworks like AutoGen and CrewAI — the phone gateway can serve as the coordinator for this kind of multi-step reasoning.
+Data that leaves the phone (encrypted, per-request):
+  - Conversation context  --> HTTPS to api.openrouter.ai --> Model provider
+  - Model response        <-- HTTPS from api.openrouter.ai
+```
 
-### Why a Phone
+The trust boundary diagram in [docs/architecture.md](./architecture.md) maps this precisely. The gateway binds to loopback only (`127.0.0.1:18789`), so nothing on the local network can reach it. All remote access goes through the SSH tunnel over Tailscale's WireGuard encryption.
 
-Model routing is a compute-light task. The phone does not need to do the thinking — it needs to be the stable orchestrator that maintains the task state, manages the API calls, and collects results. An always-on $349 phone is a better orchestrator than a $25/month VM for this pattern because it is cheaper, simpler to manage, and more redundant.
+For maximum privacy, you can select models with explicit no-data-retention policies:
 
-As an added benefit, having all model routing go through one device means all API costs flow through one OpenRouter account, making cost analysis straightforward.
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/meta-llama/llama-3.1-70b"
+      }
+    }
+  }
+}
+```
 
-### Example Workflow
+Meta's Llama models via OpenRouter carry no data retention by the provider. Anthropic and OpenAI have their own retention policies (typically 30 days for API usage, no training on API data).
 
-You configure a routing rule: any message containing code or programming keywords routes to Sonnet; any message starting with "quick" or "tldr" routes to Haiku; all others route to Haiku with automatic escalation to Sonnet if the response is unsatisfactory.
+### What This Architecture Protects Against
 
-You send a complex request:
+| Threat | Protection |
+|--------|-----------|
+| Provider reads your history | History stays on phone; provider sees only per-request context |
+| Network eavesdropping | Tailscale (WireGuard) for SSH; TLS 1.3 for OpenRouter API |
+| Local network attack | Gateway binds to loopback only; no exposed ports |
+| Device theft | Android full-disk encryption (enabled by default on Pixel) |
+| Provider data breach | Your history is not in their database; only transient request logs |
 
-> "Analyze this SQL query for performance issues, suggest indexes, and explain why the query planner might be choosing a full table scan."
+### What This Architecture Does NOT Protect Against
 
-The gateway classifies this as a code/analysis task, routes it to Claude Sonnet via OpenRouter, receives the detailed analysis, and returns it to you. The cost for this exchange is the Sonnet rate, not the Opus rate, because the routing rules correctly identified it as within Sonnet's capability.
+| Threat | Why Not |
+|--------|---------|
+| Model provider sees each request | Inference requires sending context to the cloud. This is inherent to the relay architecture. |
+| OpenRouter sees your API traffic | OpenRouter routes your requests. They see request metadata and can log content per their privacy policy. |
+| Compromised phone | If the phone is rooted or infected with malware, all local data is exposed. |
+| Legal compulsion | A subpoena to OpenRouter or the model provider could yield request logs. |
 
-You then ask:
+### Limitations and Caveats
 
-> "Quick — what's the capital of France?"
-
-The gateway classifies this as a simple Q&A, routes to Haiku, and returns "Paris" in under a second for 1/12th the cost of the previous query.
-
-Over a month, the routing rules reduce your OpenRouter bill by 40-60% compared to using Sonnet for every request, with no degradation in quality for the tasks that Haiku handles well.
+- **This is not air-gapped AI.** Every inference call sends your conversation context to a cloud provider. If your threat model requires that no data leave the device at all, you need local inference (llama.cpp on the Tensor G4), which is on the roadmap but not the default configuration.
+- **OpenRouter is a man-in-the-middle by design.** It routes your requests to model providers. Their [privacy policy](https://openrouter.ai/privacy) governs what they log and retain. If this is unacceptable, use direct provider APIs instead.
+- **Conversation context includes the full history** up to the compaction limit. If you discuss a sensitive topic in message 3 and ask about the weather in message 20, the sensitive topic is still in the context sent with message 20 (until compaction removes it).
+- **Android itself is not privacy-maximizing.** Google services on the Pixel collect telemetry. This guide does not cover de-Googling the device. The privacy boundary described here is specifically about AI conversation data, not general phone telemetry.
+- **Backups can leak data.** If the phone's data is backed up to Google (default behavior), `~/.openclaw/` contents may be included. Disable cloud backup for Termux data if this is a concern.
 
 ---
 
-## 10. Learning Tutor with Persistent Context
+## 8. Development Companion
 
-### What It Is
+### Why It Matters
 
-A personalized tutor that maintains a model of your current knowledge state, tracks what you have learned, identifies gaps, and adapts explanations to your level — persisting this model across sessions on your own hardware rather than resetting each time.
+AI coding assistants in IDEs (Copilot, Cursor, Claude in VS Code) are powerful but ephemeral: they lose context when you close the IDE, switch projects, or move to a different machine. If you work across multiple computers (desktop at home, laptop at the office, tablet on the couch), each session starts fresh.
 
-### How It Works
+A gateway on the phone provides a neutral, always-available development companion. The session persists across days and device switches. You can start debugging a problem on your desktop, continue on your laptop at a coffee shop, and pick up where you left off from your phone on the train -- same context, same conversation history.
 
-OpenClaw's memory architecture stores extracted facts from conversations. In a tutoring context, this means:
-- Concepts you have demonstrated understanding of
-- Topics where you struggled or asked for clarification
-- Your preferred explanation style (more analogies, more math, more code examples)
-- Your stated goals and the curriculum you are working through
-- Questions you have asked before (to avoid repetition)
+### How It Works Architecturally
 
-When you start a new session, the gateway retrieves this context and the tutor is immediately calibrated to your current state. You do not start over. The tutor knows where you left off.
+You SSH into the Pixel 10a from any machine and open the Canvas UI via the port-forwarded connection. The assistant has access to shell tools (command execution), file tools (read/write files), and web search. It can read code, run tests, check git status, and explain error messages.
 
-Sessions can happen across any device — phone keyboard during a commute, laptop Canvas UI at home, voice note via Telegram. The session history and memory are on the phone, not in the client.
+```
+Any machine (home desktop, work laptop, borrowed computer)
+  --> SSH to Pixel 10a via Tailscale (port 8022)
+    --> Port forward 18789
+      --> Canvas UI at localhost:18789
+        --> Persistent session with full conversation history
+```
 
-### Why a Phone
+For code-heavy work, you would typically switch the model from the default Haiku to a more capable model:
 
-Learning happens throughout the day in small moments — commute, lunch break, waiting in line. The phone is always in your pocket. Having the tutor on the phone means those moments are accessible without opening a laptop and navigating to a website.
+```bash
+# In the Canvas UI or via config
+openclaw config set agents.defaults.model.primary openrouter/anthropic/claude-sonnet-4-5
+```
 
-More importantly: persistent context on your own hardware means the tutor's knowledge of your learning history is not subject to a SaaS company's context window limits, data retention policies, or pricing tier. A conversation you had six months ago is still in the memory index, and the tutor can reference it.
+The phone's role is persistence and availability, not computation. It maintains the session state while the model provider does the reasoning.
 
 ### Example Workflow
 
-You are learning Rust. You have been working through ownership and borrowing for two weeks. You open Telegram on your lunch break:
+**Debugging across devices:**
 
-> "I still don't fully get why the borrow checker rejects this pattern. Can you show me a concrete example where it matters?"
+Morning, desktop at home:
 
-The tutor, with memory of your previous sessions, knows you understand heap allocation and that you find code examples more helpful than analogies. It produces a targeted example around a bug that would occur in C++ but is caught at compile time in Rust, specifically focused on the pattern you have been struggling with.
+> "I'm getting a KeyError in `/src/pipeline/transform.py` around line 80. The input data comes from the Salesforce API. Can you read the file and figure out what's happening?"
 
-You ask three follow-up questions. The exchange takes 12 minutes on your lunch break.
+The assistant reads the file via the file tool, identifies that the Salesforce API sometimes omits `LastModifiedDate` for archived records, and suggests using `.get()` with a default value.
 
-That evening, you open the Canvas UI on your laptop and continue:
+> "Run the tests in `/tests/test_transform.py` and tell me if the fix worked."
 
-> "Let's do some exercises on what we covered today."
+The assistant executes `python -m pytest tests/test_transform.py -v` via the shell tool and reports results.
 
-The tutor knows what you covered at lunch, generates appropriate exercises, evaluates your responses, and updates its model of your understanding. The lesson continues seamlessly despite the device change and the 6-hour gap.
+Afternoon, laptop at the office:
 
-The next session starts:
+> "Where did we leave off this morning?"
 
-> "What should I work on today?"
+The assistant summarizes the debugging session and the applied fix, because the session history is on the phone, not on the desktop that was used earlier.
 
-The tutor consults the knowledge model, identifies that your borrow checker understanding has improved but lifetime annotations are the next gap, and proposes a 30-minute lesson plan.
+**Git operations from anywhere:**
+
+> "What's the diff on the current branch? Summarize the changes and check if the commit messages follow conventional commits."
+
+The assistant runs `git diff`, `git log`, inspects the output, and flags any commit messages that don't follow the `feat:/fix:/refactor:` convention.
+
+**CI monitoring:**
+
+> "Check the GitHub Actions status for the main branch. Are all workflows green?"
+
+The assistant uses the GitHub API (via configured tool or shell `curl`) to check workflow status and reports back.
+
+### Limitations and Caveats
+
+- **File access is limited to the phone's filesystem** by default. The assistant can read and write files in the Termux environment. To work on files from your desktop or a remote server, you need to either clone repos to the phone or use SSH tools to access remote filesystems.
+- **Test execution happens on the phone.** Python tests will run, but they use the phone's Termux environment, which may not match your development environment exactly (different Python version, missing system dependencies, no GPU). For anything beyond basic unit tests, delegate execution to the actual development machine via SSH.
+- **The assistant does not have IDE integration.** It cannot place cursors, highlight code, or interact with your editor. It operates through text: reading files, suggesting changes, executing commands. You apply the changes yourself.
+- **Model costs increase for development work.** Code analysis and debugging require Sonnet-class models ($3/M input tokens vs $0.25/M for Haiku). A heavy debugging session with multiple file reads and test runs might cost $0.50-2.00. This is still far cheaper than a Copilot Business subscription ($19/month) but is worth tracking.
+- **Large codebases exceed context windows.** You cannot send an entire codebase to the model. The assistant works best when pointed at specific files and functions. For architectural questions spanning many files, break the query into targeted reads.
+- **Latency is noticeable for rapid iteration.** Each round trip (your question --> inference --> response) takes 2-10 seconds depending on the model and response length. For rapid debugging, this is slower than a locally-running assistant. The tradeoff is persistence and availability.
 
 ---
 
 ## Combining Use Cases
 
-These use cases are not mutually exclusive. The same gateway handles all of them simultaneously because each is a set of skills and routing rules layered on the same persistent WebSocket server.
+These use cases run simultaneously on the same gateway. The OpenClaw process handles all of them as different skill configurations and routing rules within one Node.js process at 323 MB RSS and 0% idle CPU.
 
 A fully-configured gateway might:
-- Triage notifications at 8am and 5pm via Telegram (use case 5)
-- Answer development questions from the Canvas UI during work hours (use case 3)
-- Post newsletter content on a schedule (use case 6)
-- Receive GitHub webhooks and alert on CI failures (use case 7)
-- Control home devices via WhatsApp (use case 2)
-- Continue language-learning sessions during commutes (use case 10)
 
-All of this from one $349 phone, at ~$5-15/month in inference costs.
+- Deliver a morning briefing at 7:30 AM via Telegram (use case 5)
+- Answer development questions from the Canvas UI during work hours (use case 8)
+- Receive and process field inspection photos via Telegram (use case 3)
+- Control home devices via WhatsApp (use case 4)
+- Serve as a fallback infrastructure access point over cellular (use case 2)
+- Keep all conversation history on-device (use case 7)
+- Route simple queries to Haiku and complex ones to Sonnet via OpenRouter (use case 6, phone as primary node)
+
+All from one $349 phone, at ~$5-15/month in API tokens.
 
 ---
 
 *For architecture details, see [docs/architecture.md](./architecture.md).*
-*For cost analysis and optimization, see [OPTIMIZATION-GUIDE.md](../OPTIMIZATION-GUIDE.md).*
-*For device selection, see [docs/device-strategy.md](./device-strategy.md).*
+*For installation instructions, see [INSTALL-GUIDE.md](../INSTALL-GUIDE.md).*
+*For performance tuning and cost analysis, see [OPTIMIZATION-GUIDE.md](../OPTIMIZATION-GUIDE.md).*
