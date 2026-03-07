@@ -1,6 +1,23 @@
 # Run OpenClaw on a $349 Google Pixel
 
-**An always-on AI gateway in your pocket. No cloud VM required. No monthly compute bills. Just a phone, Termux, and 30 minutes.**
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Device: Pixel 10a](https://img.shields.io/badge/Device-Pixel_10a-4285F4?logo=google)](docs/device-strategy.md)
+[![Gateway: OpenClaw](https://img.shields.io/badge/Gateway-OpenClaw-blueviolet)](https://openclaw.com)
+[![Models: OpenRouter](https://img.shields.io/badge/Models-OpenRouter-orange)](https://openrouter.ai)
+[![Newsletter](https://img.shields.io/badge/Newsletter-SpookyJuice.AI-black)](https://spookyjuice.ai)
+
+> **An always-on AI gateway in your pocket. No cloud VM. No monthly compute bills. Just a phone, Termux, and 30 minutes.**
+
+<table>
+<tr>
+<td align="center"><strong>323 MB</strong><br><sub>Gateway RAM</sub></td>
+<td align="center"><strong>0% idle</strong><br><sub>CPU at rest</sub></td>
+<td align="center"><strong>65 ms</strong><br><sub>HTTP latency</sub></td>
+<td align="center"><strong>$349</strong><br><sub>Total hardware</sub></td>
+<td align="center"><strong>$5-15/mo</strong><br><sub>API tokens</sub></td>
+<td align="center"><strong>30 min</strong><br><sub>Setup time</sub></td>
+</tr>
+</table>
 
 This guide documents how to transform a retail Google Pixel 10a into a production-grade AI edge node running OpenClaw — capable of processing messages from Telegram, WhatsApp, Discord, Slack, and more via Claude, GPT, or Gemini. It works. The phone sits on a desk, powered via USB-C, accessible from anywhere through Tailscale. Total hardware cost: $349. Monthly operating cost: $5-15 in API tokens.
 
@@ -336,19 +353,16 @@ Open an issue or submit a PR. This guide is a living document. Every install tea
 
 ## License
 
-This guide is open source. Use it, modify it, build on it.
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
-## Acknowledgments
+## Stay Updated
 
-- Termux team — for making Android as usable as Linux
-- proot-distro — for running full distros without root
-- OpenRouter — for stable, cost-effective API access to 100+ models
-- Tailscale — for making VPN boring and just working
+This project is part of **[SpookyJuice.AI](https://spookyjuice.ai)** — a newsletter exploring AI infrastructure at the edge.
+
+**[Subscribe to The Persistent Ghost](https://spookyjuice.ai)** for deep dives on running AI on unconventional hardware.
 
 ---
 
-**Last updated:** March 7, 2026 — Install tested live on Pixel 10a, Gateway running in production.
-
-*If this runs on a $349 phone, it runs on anything.*
+<sub>**Last updated:** March 7, 2026 — Tested live on Pixel 10a, gateway running in production. If this runs on a $349 phone, it runs on anything.</sub>
