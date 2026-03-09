@@ -962,6 +962,147 @@ Termux:API commands (`termux-camera-photo`, `termux-location`, `termux-wifi-scan
 
 ---
 
+## Phase 13: Agent Identity and Evolution
+
+Configure the OpenClaw agent's identity, memory, and self-evolution pipeline using EvoClaw.
+
+### Install Skills
+
+```bash
+# Install clawhub CLI
+npm i -g clawhub
+
+# Install Tier 1 skills (downloaded from GitHub if ClawHub registry is down)
+cd ~/.openclaw/workspace
+mkdir -p skills/{tmux,session-logs,github,healthcheck,model-usage,clawhub}
+for skill in tmux session-logs github healthcheck model-usage clawhub; do
+  curl -sL "https://raw.githubusercontent.com/openclaw/openclaw/main/skills/$skill/SKILL.md" \
+    -o "skills/$skill/SKILL.md"
+done
+
+# Install prerequisites for session-logs skill
+pkg install -y ripgrep
+```
+
+### Configure Model Tiering
+
+Edit `~/.openclaw/openclaw.json` to add model tiers and aliases:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/anthropic/claude-3.5-haiku",
+        "fallbacks": [
+          "openrouter/google/gemini-2.5-flash-lite",
+          "openrouter/deepseek/deepseek-chat"
+        ]
+      },
+      "models": {
+        "openrouter/anthropic/claude-3.5-haiku": { "alias": "haiku" },
+        "openrouter/anthropic/claude-sonnet-4-5": { "alias": "sonnet" },
+        "openrouter/anthropic/claude-opus-4-6": { "alias": "opus" },
+        "openrouter/google/gemini-2.5-flash-lite": { "alias": "flash" },
+        "openrouter/deepseek/deepseek-chat": { "alias": "deepseek" }
+      },
+      "heartbeat": {
+        "every": "30m",
+        "model": "openrouter/google/gemini-2.5-flash-lite"
+      },
+      "subagents": {
+        "model": "openrouter/deepseek/deepseek-chat"
+      }
+    }
+  }
+}
+```
+
+Switch models on demand with `/model sonnet` or `/model opus`.
+
+**Projected cost:** $30-50/month with Haiku as default, Flash-Lite heartbeats.
+
+### Configure Agent Identity
+
+Edit workspace bootstrap files in `~/.openclaw/workspace/`:
+
+- **SOUL.md** — Agent identity, values, boundaries, voice
+- **USER.md** — Owner profile and preferences
+- **MEMORY.md** — Long-term durable memory (keep under 100 lines)
+- **HEARTBEAT.md** — Periodic check-in tasks
+
+See the [design doc](docs/plans/2026-03-08-three-repo-architecture-design.md) for recommended content.
+
+### Install EvoClaw (Identity Evolution)
+
+[EvoClaw](https://github.com/slhleosun/EvoClaw) is a structured identity evolution framework. It lets the agent evolve its own personality through experience logging, reflection, and governed proposals.
+
+```bash
+# Download EvoClaw
+cd ~/.openclaw/workspace
+curl -sL https://github.com/slhleosun/EvoClaw/archive/refs/heads/main.tar.gz \
+  -o $PREFIX/tmp/evoclaw.tar.gz
+tar -xzf $PREFIX/tmp/evoclaw.tar.gz -C $PREFIX/tmp
+cp -r $PREFIX/tmp/EvoClaw-main/evoclaw ./evoclaw
+rm -rf $PREFIX/tmp/evoclaw.tar.gz $PREFIX/tmp/EvoClaw-main
+
+# Verify
+ls evoclaw/SKILL.md
+```
+
+> **Note:** Use `$PREFIX/tmp` instead of `/tmp` for the download — Android's `/tmp` isn't writable by Termux.
+
+### Configure EvoClaw
+
+1. **Create memory directories:**
+   ```bash
+   mkdir -p memory/{experiences,significant,reflections,proposals,pipeline}
+   ```
+
+2. **Create data files:**
+   ```bash
+   touch memory/significant/significant.jsonl
+   touch memory/proposals/pending.jsonl
+   touch memory/proposals/history.jsonl
+   touch memory/soul_changes.jsonl
+   ```
+
+3. **Create state file** (`memory/evoclaw-state.json`):
+   ```json
+   {
+     "last_reflection_at": null,
+     "last_heartbeat_at": null,
+     "pending_proposals_count": 0,
+     "total_experiences_today": 0,
+     "total_reflections": 0,
+     "total_soul_changes": 0,
+     "source_last_polled": {}
+   }
+   ```
+
+4. **Set governance mode** in `evoclaw/config.json`:
+   - `autonomous` — agent evolves freely, you're notified
+   - `advisory` — some sections auto-evolve, others need approval
+   - `supervised` — every change needs your approval
+
+5. **Restructure SOUL.md** with `[CORE]` and `[MUTABLE]` tags:
+   - `[CORE]` — Immutable beliefs (safety rules, privacy, identity fundamentals)
+   - `[MUTABLE]` — Evolvable traits (communication style, opinions, learned patterns)
+
+6. **Update HEARTBEAT.md** — Prepend the EvoClaw pipeline (10 steps: ingest, reflect, propose, govern, apply, log, state, notify, verify, report)
+
+7. **Update AGENTS.md** — Add EvoClaw boot sequence, logging protocol, heartbeat priority
+
+8. **Validate:**
+   ```bash
+   python3 evoclaw/validators/validate_soul.py SOUL.md
+   python3 evoclaw/validators/check_workspace.py
+   ```
+
+See `evoclaw/configure.md` for the full step-by-step guide and `evoclaw/SKILL.md` for the complete protocol reference.
+
+---
+
 ## Errors Encountered & Solutions
 
 | # | Error | Root Cause | Solution |
