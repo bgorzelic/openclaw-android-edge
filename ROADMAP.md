@@ -14,15 +14,15 @@
 - [x] Cost analysis (phone vs cloud VM)
 - [x] 10 documented workflows and use cases
 
-## Phase 2: Public Launch -- IN PROGRESS
+## Phase 2: Public Launch -- DONE
 
-- [~] World-class README
-- [~] Architecture and threat model docs
-- [~] Social launch kit (X, LinkedIn, Reddit, HN, Discord)
-- [~] Newsletter Issue #2 on Beehiiv
-- [ ] GitHub public repo creation
-- [ ] Social media launch sequence
-- [ ] Community feedback collection
+- [x] World-class README
+- [x] Architecture and threat model docs
+- [x] Social launch kit (X, LinkedIn, Reddit, HN, Discord)
+- [x] Newsletter Issue #2 on Beehiiv
+- [x] GitHub public repo creation
+- [x] Social media launch sequence
+- [x] Community feedback collection
 
 ## Phase 3: Channel Integrations -- PLANNED
 
@@ -35,14 +35,16 @@
 ## Phase 4: Fleet Operations -- PLANNED
 
 - [ ] Multi-device support and documentation
-- [ ] Auto-start on boot (Termux:Boot plugin)
-- [ ] Health check cron with auto-restart
+- [x] Auto-start on boot (Termux:Boot + self-healing script)
+- [x] Health check cron with auto-restart (watchdog every 2 min)
+- [x] Developer environment on device (Claude Code, Python, dev tools)
 - [ ] Log rotation and disk management
 - [ ] Remote fleet monitoring dashboard
 - [ ] Device-to-device agent communication
 
 ## Phase 5: Edge Intelligence -- EXPLORING
 
+- [~] SIGNAL network intelligence platform (github.com/bgorzelic/SIGNAL)
 - [ ] Local inference with llama.cpp on Tensor G4
 - [ ] Sensor integration (camera, GPS, mic via Termux:API)
 - [ ] Multi-agent routing (Haiku for triage, Sonnet for work)

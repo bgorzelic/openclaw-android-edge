@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-03-08
+
+### Added
+- Claude Code (v2.1.71) running on the Pixel 10a with proot /tmp wrapper
+- Full dev environment: Python 3.13, tmux, jq, sqlite3
+- claude-dev wrapper script for Termux /tmp sandbox fix
+- Phase 12: Developer Environment Setup in INSTALL-GUIDE.md
+- Private config backup repo (pixel-10a-edge-node-config)
+- Related Projects section in README linking to SIGNAL
+- Design doc for three-repo architecture
+- Use Case #9: Network Intelligence (SIGNAL)
+
+### Changed
+- OpenClaw upgraded: 2026.3.2 → 2026.3.7
+- Node.js upgraded: v22.x (proot) → v25.3.0 (native)
+- Gateway RSS reduced: 323 MB → 184 MB (43% reduction)
+- NODE_OPTIONS memory cap: 256 MB → 384 MB (matches production)
+- Boot persistence: documented as stable (was optional/planned)
+- Watchdog: documented as production-proven
+- Phase 2 (Public Launch): marked as DONE in roadmap
+
+### Removed
+- Device-specific files from public repo (moved to private config repo)
+
 ## [0.2.0] - 2026-03-07
 
 ### Added

@@ -22,6 +22,7 @@ For architecture details, see [docs/architecture.md](./architecture.md). For ins
 6. [Multi-Node Relay](#6-multi-node-relay)
 7. [Privacy-First Personal AI](#7-privacy-first-personal-ai)
 8. [Development Companion](#8-development-companion)
+9. [Network Intelligence Sensor](#9-network-intelligence-sensor)
 
 ---
 
@@ -544,6 +545,87 @@ The assistant uses the GitHub API (via configured tool or shell `curl`) to check
 
 ---
 
+## 9. Network Intelligence Sensor
+
+### Why It Matters
+
+Understanding wireless network environments -- signal strength, interference patterns, coverage gaps, cellular tower quality -- traditionally requires expensive specialized equipment or enterprise-grade diagnostic software. A phone already has WiFi, cellular, and Bluetooth radios with APIs exposed through Termux:API. Combined with AI for analysis and pattern recognition, the Pixel 10a becomes a portable network diagnostic sensor.
+
+This is the foundation of the [SIGNAL project](https://github.com/bgorzelic/SIGNAL) -- a network intelligence platform that runs as an OpenClaw skill on the same hardware described in this guide.
+
+### How It Works Architecturally
+
+Termux:API exposes Android's wireless subsystems as CLI commands. SIGNAL wraps these into structured data collection workflows:
+
+```
+Trigger (scheduled scan, manual command, or event-based)
+  --> termux-wifi-scaninfo (all visible SSIDs, signal strength, frequency, security)
+  --> termux-telephony-cellinfo (cell towers, signal level, network type)
+  --> termux-location (GPS for geo-tagged measurements)
+  --> Send structured data to model for analysis
+      (pattern recognition, anomaly detection, coverage mapping)
+  --> Store results in SQLite for historical comparison
+  --> Report via Telegram/Canvas with recommendations
+```
+
+The phone's radios do passive scanning -- no monitor mode or special hardware required. WiFi scan results include SSID, BSSID, frequency, signal level (dBm), channel width, and security protocol for every visible access point.
+
+### Example Data Collection
+
+WiFi environment scan:
+
+```bash
+# Raw scan (returns JSON array of all visible networks)
+termux-wifi-scaninfo
+
+# Example output (truncated):
+# [
+#   {
+#     "bssid": "aa:bb:cc:dd:ee:ff",
+#     "ssid": "HomeNetwork",
+#     "frequency": 5180,
+#     "level": -42,
+#     "channelWidth": 80,
+#     "capabilities": "[WPA2-PSK-CCMP][RSN-PSK-CCMP][ESS]"
+#   },
+#   ...
+# ]
+```
+
+Cellular environment:
+
+```bash
+# Cell tower info (returns JSON with tower details)
+termux-telephony-cellinfo
+
+# Device network info
+termux-telephony-deviceinfo
+```
+
+Combined with GPS coordinates from `termux-location`, each scan creates a geo-tagged snapshot of the wireless environment.
+
+### Use Cases Within This Use Case
+
+1. **Home WiFi optimization** -- Walk through your house with the phone running periodic scans. Map signal strength by room. Identify dead zones and interference from neighboring networks.
+
+2. **Site survey for new deployments** -- Before installing access points at a client site, survey existing RF conditions. The AI analyzes scan data and recommends AP placement based on existing interference and building layout.
+
+3. **Cellular coverage mapping** -- Drive or walk a route with continuous cell tower logging. Build a coverage map showing signal quality, handoff points, and dead zones. Useful for fleet management or remote site assessment.
+
+4. **Network security audit** -- Scan for rogue access points, open networks, or unexpected devices. The AI flags anomalies compared to a known-good baseline.
+
+5. **Ongoing monitoring** -- Schedule periodic scans via cron. The AI compares current results to historical baselines and alerts on changes -- new networks appearing, signal degradation, or interference patterns.
+
+### Limitations and Caveats
+
+- **Termux:API sensor commands require foreground context.** They hang when called over SSH. Scans must be triggered locally on the phone, via OpenClaw (which has foreground context), or via Termux:Boot scheduled scripts.
+- **WiFi scanning is passive only.** No monitor mode, no packet capture, no deauthentication. Android restricts raw wireless frame access without root. This limits analysis to what the standard scan API provides.
+- **Scan frequency is throttled by Android.** Since Android 9, background WiFi scan frequency is limited to prevent battery drain. Foreground scans are unrestricted, but rapid-fire scanning from a background service may be throttled.
+- **SIGNAL is early-stage.** The project has scaffolding (README, requirements, skill.json, src/) but is not yet a polished, installable skill. Expect to write Python code to chain the termux-api commands into useful workflows.
+- **Cellular info varies by carrier and region.** Some carriers restrict what `termux-telephony-cellinfo` reports. Coverage mapping accuracy depends on the data your carrier exposes.
+
+---
+
 ## Combining Use Cases
 
 These use cases run simultaneously on the same gateway. The OpenClaw process handles all of them as different skill configurations and routing rules within one Node.js process at 323 MB RSS and 0% idle CPU.
@@ -557,6 +639,7 @@ A fully-configured gateway might:
 - Serve as a fallback infrastructure access point over cellular (use case 2)
 - Keep all conversation history on-device (use case 7)
 - Route simple queries to Haiku and complex ones to Sonnet via OpenRouter (use case 6, phone as primary node)
+- Continuously monitor the wireless environment and alert on anomalies (use case 9)
 
 All from one $349 phone, at ~$5-15/month in API tokens.
 
