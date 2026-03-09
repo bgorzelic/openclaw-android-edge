@@ -3,7 +3,7 @@
 > **Author:** Brian Gorzelic / AI Aerial Solutions
 > **Date:** March 6, 2026
 > **Device:** Google Pixel 10a (128GB, Unlocked, Best Buy)
-> **OpenClaw Version:** 2026.3.2
+> **OpenClaw Version:** 2026.3.7
 > **Status:** Install guide with full error log documentation
 
 ---
@@ -861,7 +861,7 @@ The gateway works out of the box, but several optimizations make it reliable for
 2. **Use OpenRouter model prefix** — `openrouter/anthropic/claude-3.5-haiku` not `anthropic/...`
 3. **Disable mDNS** — `openclaw config set discovery.mdns.mode off`
 4. **Disable auth** (loopback-only) — `openclaw config set gateway.auth.mode none`
-5. **Cap Node.js memory** — `export NODE_OPTIONS="--max-old-space-size=256"`
+5. **Cap Node.js memory** — `export NODE_OPTIONS="--max-old-space-size=384"`
 6. **Exempt Termux from battery optimization** — Settings > Apps > Termux > Battery > Unrestricted
 7. **Acquire Termux wake lock** — prevents Android from killing the process
 8. **Auto-start on shell login** — add gateway start to `~/.bashrc`
@@ -873,7 +873,7 @@ The gateway works out of the box, but several optimizations make it reliable for
 # Environment
 export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
 export OPENCLAW_DISABLE_BONJOUR=1
-export NODE_OPTIONS="--max-old-space-size=256"
+export NODE_OPTIONS="--max-old-space-size=384"
 
 # Auto-start sshd
 if ! pgrep -f sshd > /dev/null 2>&1; then
@@ -896,6 +896,72 @@ fi
 
 ---
 
+## Phase 12: Developer Environment
+
+The Pixel 10a can run a full development environment including Claude Code (AI coding agent) directly on the device.
+
+### Install Dev Tools
+
+```bash
+# In native Termux (not proot)
+pkg install -y python tmux jq sqlite
+```
+
+### Install Claude Code
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+Claude Code requires authentication. Run `claude` on the phone's screen (not over SSH) and follow the OAuth flow to sign in.
+
+### The /tmp Sandbox Fix
+
+Claude Code creates its sandbox in `/tmp/claude-<uid>/`, but Termux's `/tmp` is owned by Android's `shell` user and isn't writable. The fix is a lightweight `proot` wrapper that remaps Termux's writable tmp directory:
+
+```bash
+# Create the wrapper (one-time setup)
+cat > $PREFIX/bin/claude-dev << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+# Claude Code wrapper for Termux — fixes /tmp sandbox issue
+exec proot -b $PREFIX/tmp:/tmp claude "$@"
+EOF
+chmod +x $PREFIX/bin/claude-dev
+```
+
+Now use `claude-dev` instead of `claude`:
+
+```bash
+# Interactive session
+claude-dev
+
+# Non-interactive (from scripts or SSH)
+echo "your prompt" | claude-dev --print --dangerously-skip-permissions
+```
+
+### Sensor Access Note
+
+Termux:API commands (`termux-camera-photo`, `termux-location`, `termux-wifi-scaninfo`, etc.) require Android foreground context. They work from the phone's Termux session but **hang when called over SSH**. For sensor-heavy development:
+
+- Use the phone's screen directly, or
+- Trigger sensor commands via OpenClaw (which has foreground context), or
+- Queue sensor tasks and process results asynchronously
+
+### Dev Environment Summary
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Node.js | v25.3.0 | OpenClaw runtime, skill dev |
+| Python | 3.13.12 | App development, sensors |
+| Claude Code | 2.1.71 | AI coding agent on device |
+| git + gh | 2.53.0 / 2.87.3 | Version control, GitHub |
+| tmux | 3.6a | Persistent dev sessions |
+| jq | 1.8.1 | JSON processing |
+| sqlite3 | 3.52.0 | Data persistence |
+| Termux:API | 0.59.1 | 80+ Android sensor commands |
+
+---
+
 ## Errors Encountered & Solutions
 
 | # | Error | Root Cause | Solution |
@@ -908,6 +974,7 @@ fi
 | 6 | `requires nodejs v22.12+` | Ubuntu default repos have old Node.js | Install via NodeSource `setup_22.x` |
 | 7 | `device_config put` SecurityException | Adaptive battery config requires root | Set manually: Settings > Apps > Termux > Battery > Unrestricted |
 | 8 | Phone screen goes black during install | Screen timeout too short | `adb shell svc power stayon usb` + 30min timeout |
+| 9 | Claude Code `/tmp` sandbox fails | Termux `/tmp` owned by shell:shell, not writable by app | Use `claude-dev` wrapper: `proot -b $PREFIX/tmp:/tmp claude` |
 
 ---
 
@@ -949,9 +1016,11 @@ Core 7:   Cortex-X4  (0xd82) — Prime core
 ```
 Termux:          0.118.3 (GitHub release, installed 2026-03-06 16:42:05)
 proot-distro:    Ubuntu (installed via pkg)
-Node.js:         22.x (via NodeSource, inside proot Ubuntu)
-npm:             (bundled with NodeSource Node.js)
-OpenClaw:        2026.3.2 (latest as of 2026-03-06)
+Node.js:         25.3.0 (native Termux, via NodeSource)
+npm:             11.11.0
+OpenClaw:        2026.3.7 (upgraded from 2026.3.2)
+Python:          3.13.12 (native Termux)
+Claude Code:     2.1.71 (via npm, uses claude-dev wrapper)
 ```
 
 ### ADB Optimization Commands (Copy-Paste Ready)

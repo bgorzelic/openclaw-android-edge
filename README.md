@@ -10,7 +10,7 @@
 
 <table>
 <tr>
-<td align="center"><strong>323 MB</strong><br><sub>Gateway RAM</sub></td>
+<td align="center"><strong>184 MB</strong><br><sub>Gateway RAM</sub></td>
 <td align="center"><strong>0% idle</strong><br><sub>CPU at rest</sub></td>
 <td align="center"><strong>65 ms</strong><br><sub>HTTP latency</sub></td>
 <td align="center"><strong>$349</strong><br><sub>Total hardware</sub></td>
@@ -36,6 +36,7 @@ After following this guide, you'll have:
 - **Scheduled automation** — run recurring tasks like "7 AM briefing" or "end-of-day summary"
 - **Sub-100ms latency** over local network or Tailscale VPN
 - **Live logs and monitoring** with a web dashboard
+- **Developer environment** — Python, Claude Code, and full dev tooling run directly on the phone
 
 The phone never touches inference — it relays messages to OpenRouter (giving access to Haiku, Sonnet, Opus, Gemini, and 100+ other models). All compute happens in the cloud at cheaper rates because you're not renting the server.
 
@@ -66,7 +67,10 @@ A phone is already designed to be always-on. It has its own power supply, can su
 | Tailscale networking | Stable | Gives stable IP from anywhere |
 | Multiple AI models | Stable | Claude Haiku (default), can switch to Sonnet/Opus |
 | HTML/CSS dashboard | Working | Access via SSH tunnel or Tailscale |
-| Scheduled cron tasks | Planned | Issue #3 |
+| Scheduled cron tasks | Working | Via system cron + watchdog |
+| Claude Code on device | Working | v2.1.71 via claude-dev wrapper |
+| Auto-start on boot | Stable | Termux:Boot + self-healing script |
+| Watchdog auto-restart | Stable | Cron every 2 min, HTTP health check |
 | WhatsApp channel | Planned | Issue #3 |
 | Telegram channel | Planned | Issue #3 |
 | Local llama.cpp inference | Exploring | Edge AI on Tensor G4 |
@@ -193,7 +197,7 @@ The phone does zero AI inference. It's a relay and a dashboard. All the compute 
 
 Measured on a live gateway:
 
-- **Memory**: 323 MB RSS (4.1% of total RAM)
+- **Memory**: 184 MB RSS (2.4% of total RAM)
 - **CPU (idle)**: 0.00% (zero measurable load when waiting)
 - **HTTP latency**: 65ms average (131ms cold, 45-52ms warm)
 - **Threads**: 11 (1 event loop + 4 libuv + 6 V8/GC)
@@ -322,6 +326,12 @@ If a $349 phone with 8GB RAM can do this, the cloud VM market needs to reconside
 
 ---
 
+## Related Projects
+
+- **[SIGNAL](https://github.com/bgorzelic/SIGNAL)** — Network intelligence platform that transforms Android devices into wireless diagnostic sensors. Runs as an OpenClaw skill on the same Pixel 10a hardware.
+
+---
+
 ## Built By
 
 **Brian Gorzelic** — AI Aerial Solutions
@@ -365,4 +375,4 @@ This project is part of **[SpookyJuice.AI](https://spookyjuice.ai)** — a newsl
 
 ---
 
-<sub>**Last updated:** March 7, 2026 — Tested live on Pixel 10a, gateway running in production. If this runs on a $349 phone, it runs on anything.</sub>
+<sub>**Last updated:** March 8, 2026 — Tested live on Pixel 10a, gateway running in production. If this runs on a $349 phone, it runs on anything.</sub>

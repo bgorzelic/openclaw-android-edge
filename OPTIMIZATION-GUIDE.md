@@ -163,10 +163,10 @@ Cap Node.js heap to prevent the gateway from growing unbounded:
 
 ```bash
 # In ~/.bashrc or startup script:
-export NODE_OPTIONS="--max-old-space-size=256"
+export NODE_OPTIONS="--max-old-space-size=384"
 ```
 
-This limits the V8 heap to 256 MB. The gateway typically uses ~150-200 MB of heap, so this provides headroom while preventing runaway growth.
+This limits the V8 heap to 384 MB. The gateway typically uses ~150-200 MB of heap, so this provides headroom while preventing runaway growth.
 
 ### 4. Termux Wake Lock
 
@@ -315,7 +315,7 @@ ssh termux 'kill -9 $(pgrep -f openclaw-gateway); sleep 2; nohup openclaw gatewa
 | "uv_interface_addresses error 13" | Running inside proot-distro | Run gateway in native Termux instead |
 | SSH "too many auth failures" | Multiple SSH keys offered | Add `IdentitiesOnly yes` to SSH config |
 | Termux killed in background | Android battery optimization | Exempt Termux from battery optimization |
-| Gateway slow after hours | Node.js memory growth | Set `NODE_OPTIONS="--max-old-space-size=256"` |
+| Gateway slow after hours | Node.js memory growth | Set `NODE_OPTIONS="--max-old-space-size=384"` |
 | Canvas loads but chat fails | WebSocket not connected | Check gateway logs: `tail ~/openclaw-gateway.log` |
 
 ---
